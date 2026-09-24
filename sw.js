@@ -1,4 +1,4 @@
-const CACHE_NAME='mecanica-ze-v4';
+const CACHE_NAME='mecanica-ze-v5';
 const PRECACHE=[
  './','./index.html','./manifest.json',
  './css/game.css','./css/mobile.css',
@@ -16,7 +16,12 @@ self.addEventListener('activate',event=>{
 self.addEventListener('fetch',event=>{
  if(event.request.method!=='GET')return;
  if(event.request.mode==='navigate'){
-   event.respondWith(fetch(event.request).then(res=>{const copy=res.clone();caches.open(CACHE_NAME).then(c=>c.put('./index.html',copy));return res;}).catch(()=>caches.match('./index.html')));
+   event.respondWith(fetch(event.request).then(res=>{
+     if(!res || !res.ok) throw new Error('navigation failed');
+     const copy=res.clone();
+     caches.open(CACHE_NAME).then(c=>c.put('./index.html',copy));
+     return res;
+   }).catch(()=>caches.match('./index.html').then(cached=>cached||Response.error())));
    return;
  }
  event.respondWith(caches.match(event.request).then(cached=>{
