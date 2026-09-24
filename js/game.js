@@ -774,7 +774,7 @@ const SaveSystem = (() => {
  if (d.player) { player.x = d.player.x; player.y = d.player.y; }
  if (typeof BillsSystem !== 'undefined' && BillsSystem.reset) BillsSystem.reset();
  if (d.bills && typeof BillsSystem !== 'undefined') BillsSystem.applySaveData(d.bills);
- actionCooldown = 0; fixingCar = null; fixTimer = 0;
+ actionCooldown = 0; fixingCar = null; fixTimer = 0; playerAction = null; playerActionTimer = 0;
  if (WeatherSystem.isRainy()) WeatherSystem.spawnRain(); else rainDrops = [];
  _wasOpen = isOpen();
  }
@@ -1340,14 +1340,36 @@ const CHARACTER_SPRITES = (() => {
   image.src = src;
   return asset;
  };
+ const props=makeAsset("./assets/sprites/actions.png");
  return {
   cellW:24, cellH:32,
   rows:{down:0,up:1,left:2,right:3},
+  propCellW:16, propCellH:16,
+  props, propIndex:{fix:0,diagnose:1,carry:2,toolbox:3},
   ze:makeAsset("./assets/sprites/ze.png"),
   helper:makeAsset("./assets/sprites/ajudante.png")
  };
 })();
-function drawCharacterSprite(entity, kind, active=true){
+let playerAction=null, playerActionTimer=0;
+function setPlayerAction(type,ticks=30){ playerAction=type; playerActionTimer=Math.max(playerActionTimer,ticks); }
+function drawActionProp(entity, action, kind, cx, footY, drawW, drawH){
+ const sheet=CHARACTER_SPRITES.props;
+ if(!action || !sheet.ready || sheet.failed) return;
+ let key=action;
+ if(key==='restock') key='toolbox';
+ if(key==='tired') return;
+ const idx=CHARACTER_SPRITES.propIndex[key];
+ if(idx==null) return;
+ const phase=Math.floor(tick/6)%2;
+ let ox=0, oy=0;
+ if(entity.dir==='left') ox=-drawW*0.35;
+ else if(entity.dir==='right') ox=drawW*0.35;
+ else ox=(phase?1:-1)*drawW*0.18;
+ oy=action==='carry' ? -drawH*0.30 : -drawH*0.43 + (phase?1:-1)*2;
+ const size=action==='carry'?20:18;
+ ctx.drawImage(sheet.image,idx*16,0,16,16,Math.round(cx+ox-size/2),Math.round(footY+oy-size/2),size,size);
+}
+function drawCharacterSprite(entity, kind, active=true, action=null){
  const asset = CHARACTER_SPRITES[kind];
  if(!asset || !asset.ready || asset.failed) return false;
  const row = CHARACTER_SPRITES.rows[entity.dir] ?? 0;
@@ -1356,6 +1378,9 @@ function drawCharacterSprite(entity, kind, active=true){
  const drawH = kind === "ze" ? 56 : 54;
  const cx = tx(entity.x + entity.w/2);
  const footY = ty(entity.y + entity.h + 2);
+ const phase=Math.floor(tick/6)%2;
+ const actionBob=action && action!=='tired' ? (phase?1:-1)*1.5 : 0;
+ const tiredDrop=action==='tired'?3:0;
  ctx.save();
  ctx.imageSmoothingEnabled = false;
  ctx.fillStyle = "rgba(0,0,0,0.30)";
@@ -1366,8 +1391,9 @@ function drawCharacterSprite(entity, kind, active=true){
   asset.image,
   frame*CHARACTER_SPRITES.cellW,row*CHARACTER_SPRITES.cellH,
   CHARACTER_SPRITES.cellW,CHARACTER_SPRITES.cellH,
-  Math.round(cx-drawW/2),Math.round(footY-drawH),drawW,drawH
+  Math.round(cx-drawW/2),Math.round(footY-drawH+actionBob+tiredDrop),drawW,drawH
  );
+ if(action) drawActionProp(entity,action,kind,cx,footY,drawW,drawH);
  ctx.restore();
  return true;
 }
@@ -2092,6 +2118,7 @@ function doFix(){
  if(parts<_gNeeds){SFX.error();showToast(`Peças insuficientes! Precisa de ${_gNeeds} 📦`);return;}
  }
  fixingCar=car;fixTimer=0;
+ setPlayerAction('fix',28);
  stamina=Math.max(0,stamina-12*(window._fixStaminaMult||1));
  hunger=Math.max(0,hunger-3);
  actionCooldown=Math.floor(20*(window._cooldownMult||1));
@@ -2162,6 +2189,7 @@ function doDiagnose(){
  const car=bay.car;
  if(car.diagnosed){showToast(`Já diagnosticado: ${car.problem.emoji} ${car.problem.name}`);return;}
  car.diagnosed=true;actionCooldown=Math.floor(30*(window._diagCooldownMult||1));
+ setPlayerAction('diagnose',34);
  SFX.diagnose();
  spawnFloatText(car.x+car.w/2,car.y,`🔍 ${car.problem.emoji} ${car.problem.name}`,"#60a5fa");
  showToast(`Problema: ${car.problem.emoji} ${car.problem.name} — Peças: ${car.problem.parts}`);
@@ -2181,6 +2209,7 @@ function doRestock(){
  const cost=Math.floor((window._restockCost||30)*(window._diffPartsCostMult||1))*(maxParts-parts);
  if(money<cost){showToast(`Precisa de $${cost} para reabastecer! 💸`);return;}
  money-=cost;parts=maxParts;
+ setPlayerAction('restock',46);
  SFX.restock();
  showToast("📦 Peças reabastecidas!");updateHUD();renderUpgradePanel();
  spawnParticles(shelf.x+shelf.w/2,shelf.y,"#60a5fa",8);
@@ -3142,7 +3171,9 @@ function drawPerson(px2,py2,pw,ph,skin,shirt,dir,frame,isHelper=false){
  }
 }
 function drawPlayer(){
- if(!drawCharacterSprite(player,"ze",moving)) drawPerson(player.x,player.y,player.w,player.h,"#f5cba7","#b45309",player.dir,player.frame,false);
+ const visualAction=playerAction || ((!moving && stamina<maxStamina*0.2)?'tired':null);
+ const actionAnimated=!!visualAction && visualAction!=='tired';
+ if(!drawCharacterSprite(player,"ze",moving||actionAnimated,visualAction)) drawPerson(player.x,player.y,player.w,player.h,"#f5cba7","#b45309",player.dir,player.frame,false);
  const nameX=tx(player.x+player.w/2);const nameY=ty(player.y-28);
  ctx.fillStyle="rgba(0,0,0,0.8)";ctx.fillRect(nameX-20,nameY,40,15);
  const glowPulse=0.6+0.4*Math.sin(tick*0.1);
@@ -3154,7 +3185,11 @@ function drawPlayer(){
 function drawHelpers(){
  helpers.forEach(h=>{
  const helperActive = h.state !== HELPER_STATES.IDLE || !!h.patrolTarget;
- if(!drawCharacterSprite(h,"helper",helperActive)) drawPerson(h.x,h.y,h.w,h.h,"#fdbcb4","#3b82f6",h.dir,h.frame,true);
+ let helperAction=null;
+ if(h.state===HELPER_STATES.FIXING) helperAction='fix';
+ else if(h.state===HELPER_STATES.DIAGNOSING) helperAction='diagnose';
+ else if(h.state===HELPER_STATES.RESTOCKING) helperAction='carry';
+ if(!drawCharacterSprite(h,"helper",helperActive,helperAction)) drawPerson(h.x,h.y,h.w,h.h,"#fdbcb4","#3b82f6",h.dir,h.frame,true);
  drawHelperStateIcon(h);
  drawHelperSpeech(h);
  });
@@ -3324,6 +3359,7 @@ function update(){
  for(let i=floatTexts.length-1;i>=0;i--){if(floatTexts[i].life<=0)floatTexts.splice(i,1);}
  if(stamina<maxStamina*0.2&&stamina>0&&tick%90===0)SFX.staminaWarn();
  if(actionCooldown>0)actionCooldown--;
+ if(playerActionTimer>0){playerActionTimer--;if(playerActionTimer<=0){playerActionTimer=0;playerAction=null;}}
  if(tick%120===0){updateHUD();checkMissions();renderUpgradePanel();checkAchievements();checkBankruptcy();checkBankruptcyRecovery();}
 }
 function draw(){
@@ -3468,7 +3504,7 @@ function resetGameState(){
  staminaDrain=0.05;staminaRegen=0.04;
  diagnosticLevel=1;toolQuality=1;reputationMult=1;
  gameMinute=8*60;tick=0;spawnDelay=1800;spawnTimer=0; weatherTimer=0;nextWeatherChange=1800;
- _lastTierIdx=0;_tierUpAnim=null; actionCooldown=0;fixingCar=null;fixTimer=0;
+ _lastTierIdx=0;_tierUpAnim=null; actionCooldown=0;fixingCar=null;fixTimer=0;playerAction=null;playerActionTimer=0;
  cars.length=0;particles.length=0;floatTexts.length=0;helpers.length=0;speechBubbles.length=0;
  bays.forEach(b=>b.car=null);
  player.x=400;player.y=600;player.dir="down";player.frame=0;
