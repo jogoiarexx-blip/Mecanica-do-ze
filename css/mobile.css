@@ -1,0 +1,159 @@
+
+#mobile-controls {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 180px;
+  z-index: 50;
+  pointer-events: none;
+  user-select: none;
+  background: rgba(0,0,0,0.5);
+  border-top: 1px solid rgba(232,130,10,0.2);
+}
+/* Show only on touch devices */
+@media (hover: none) and (pointer: coarse) {
+  #mobile-controls { display: flex; }
+}
+
+/* ---- JOYSTICK (left side) ---- */
+#joy-zone {
+  pointer-events: all;
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  width: 140px;
+  height: 140px;
+}
+#joy-base {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(232,130,10,0.12);
+  border: 2px solid rgba(232,130,10,0.4);
+}
+#joy-stick {
+  position: absolute;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #f59e0b, #b45309);
+  border: 2px solid #e8820a;
+  box-shadow: 0 0 14px rgba(232,130,10,0.6);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  transition: box-shadow 0.1s;
+}
+
+/* ---- D-PAD ARROWS (alternative, shows direction feedback) ---- */
+#dpad-arrows {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  width: 128px;
+  height: 128px;
+  pointer-events: none;
+}
+.dpad-arrow {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: rgba(232,130,10,0.5);
+  transition: color 0.1s;
+}
+.dpad-arrow.active { color: #fbbf24; }
+#dpad-up    { top: 0;    left: 44px; }
+#dpad-down  { bottom: 0; left: 44px; }
+#dpad-left  { left: 0;   top: 44px; }
+#dpad-right { right: 0;  top: 44px; }
+
+/* ---- ACTION BUTTONS (right side) ---- */
+#action-btns {
+  pointer-events: all;
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.mob-btn {
+  width: 62px;
+  height: 62px;
+  border-radius: 14px;
+  border: 2px solid;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 6px;
+  gap: 4px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: transform 0.08s, box-shadow 0.08s;
+  background: rgba(0,0,0,0.75);
+}
+.mob-btn:active, .mob-btn.pressed {
+  transform: scale(0.88);
+}
+.mob-btn .mob-icon { font-size: 22px; line-height: 1; }
+
+/* Colors per button */
+#btn-fix   { border-color: #e8820a; color: #fbbf24; box-shadow: 0 0 10px rgba(232,130,10,0.4); }
+#btn-diag  { border-color: #60a5fa; color: #93c5fd; box-shadow: 0 0 10px rgba(96,165,250,0.3); }
+#btn-shop  { border-color: #34d399; color: #6ee7b7; box-shadow: 0 0 10px rgba(52,211,153,0.3); }
+#btn-rest  { border-color: #a78bfa; color: #c4b5fd; box-shadow: 0 0 10px rgba(167,139,250,0.3); }
+
+/* Pause button top-center */
+#btn-pause-mob {
+  pointer-events: all;
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid #555;
+  background: rgba(0,0,0,0.75);
+  color: #aaa;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+#btn-pause-mob:active { transform: translateX(-50%) scale(0.88); }
+
+#mobile-controls{
+  height:clamp(132px,27vh,178px);
+  padding-bottom:env(safe-area-inset-bottom);
+  background:linear-gradient(180deg,transparent,rgba(0,0,0,.58));
+}
+#joy-zone{width:clamp(108px,25vw,140px);height:clamp(108px,25vw,140px);left:max(8px,env(safe-area-inset-left));}
+#action-btns{right:max(8px,env(safe-area-inset-right));}
+.mob-btn{width:clamp(50px,13vw,62px);height:clamp(50px,13vw,62px);}
+#rotate-device{display:none;position:fixed;inset:0;z-index:1000;background:#090603;align-items:center;justify-content:center;padding:24px;text-align:center;color:#fbbf24;font-family:'Press Start 2P',monospace;}
+.rotate-card{max-width:420px;border:2px solid #e8820a;border-radius:14px;padding:28px 22px;background:#160d03;box-shadow:0 0 32px #e8820a44;display:flex;flex-direction:column;gap:16px;align-items:center;line-height:1.8;}
+.rotate-card span{font-family:'VT323',monospace;font-size:20px;color:#ddd;}
+.rotate-icon{font-size:48px;}
+@media (hover:none) and (pointer:coarse) and (orientation:portrait){#rotate-device{display:flex;}}
+@media (max-height:520px) and (orientation:landscape){
+ #mobile-controls{height:122px;}
+ #joy-zone{width:104px;height:104px;bottom:7px;}
+ #action-btns{bottom:7px;gap:5px;}
+ .mob-btn{width:50px;height:50px;font-size:5px}.mob-btn .mob-icon{font-size:18px}
+ #btn-pause-mob{bottom:8px;width:38px;height:38px}
+}
+
+@media (hover:none) and (pointer:coarse){#controls{display:none!important;}body{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right);}}
