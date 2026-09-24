@@ -1,4 +1,4 @@
-# Mecânica do Zé v2.3.1 — Correções PC + Celular
+# Mecânica do Zé v2.3.2 — Correções PC + Celular
 
 Esta versão parte da v2.2 original e mantém o conteúdo do jogo, mas reorganiza o projeto em CSS/JS separados.
 
@@ -31,7 +31,7 @@ Estrutura:
 - ícones PWA
 
 
-## Revisão 2.3.1
+## Revisão 2.3.2
 - save v4 preserva dia/tick, clima, relatório e carros ativos;
 - corrige save durante pausa que escondia o menu e deixava o jogo congelado;
 - peças específicas são consumidas somente ao concluir o serviço;
