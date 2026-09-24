@@ -1262,8 +1262,23 @@ function updateHelperAI(h) {
    }
  }
  if (h.restockTarget && !h.restockTarget.fixed) {
- h.targetCar = h.restockTarget;
- h.state = HELPER_STATES.FIXING;
+ const nextTarget = h.restockTarget;
+ const nextPart = PART_TYPES.find(pt => pt.forProblems.includes(nextTarget.problem.name));
+ const nextNeeds = Math.max(1, nextTarget.needsParts - (window._partsDiscount||0));
+ const nextShopActive = upgradesList.find(u=>u.id==='shop1')?.bought;
+ const readyToFix = nextShopActive && nextPart
+   ? (partInventory[nextPart.id]||0) >= nextNeeds
+   : parts >= nextNeeds;
+ if (readyToFix) {
+   h.targetCar = nextTarget;
+   h.state = HELPER_STATES.FIXING;
+ } else {
+   h.targetCar = null;
+   h.state = HELPER_STATES.IDLE;
+   h.idlePause = 180;
+   h.speech = '💸 Sem peças suficientes';
+   h.speechTimer = 100;
+ }
  } else {
  h.state = HELPER_STATES.IDLE;
  }
