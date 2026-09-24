@@ -1,4 +1,4 @@
-# Mecânica do Zé v2.3.2 — Correções PC + Celular
+# Mecânica do Zé v2.4.0 — Correções PC + Celular
 
 Esta versão parte da v2.2 original e mantém o conteúdo do jogo, mas reorganiza o projeto em CSS/JS separados.
 
@@ -45,3 +45,13 @@ Estrutura:
 - rádio afeta também a velocidade do ajudante;
 - relatório diário usa faturamento real e mantém o dia após recarregar;
 - controles/ratio/input receberam correções adicionais.
+
+
+## v2.4.0 — sprites do Zé e do ajudante
+- Zé agora usa spritesheet PNG otimizado e transparente com 4 direções × 4 frames;
+- ajudante ganhou spritesheet próprio, visual verde e animação direcional;
+- hitboxes e colisões continuam usando as dimensões originais para não alterar a jogabilidade;
+- render procedural antigo permanece como fallback caso o asset não carregue;
+- sprites adicionados ao precache do PWA (cache v6);
+- ícones de estado do ajudante reposicionados para não cobrir a cabeça do sprite;
+- integração validada em Chromium com movimento, troca de direção e render dos 8 testes de direção.
