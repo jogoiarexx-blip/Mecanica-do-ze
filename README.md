@@ -1,4 +1,4 @@
-# Mecânica do Zé v2.4.0 — Correções PC + Celular
+# Mecânica do Zé v2.5.0 — Correções PC + Celular
 
 Esta versão parte da v2.2 original e mantém o conteúdo do jogo, mas reorganiza o projeto em CSS/JS separados.
 
@@ -55,3 +55,12 @@ Estrutura:
 - sprites adicionados ao precache do PWA (cache v6);
 - ícones de estado do ajudante reposicionados para não cobrir a cabeça do sprite;
 - integração validada em Chromium com movimento, troca de direção e render dos 8 testes de direção.
+
+
+## v2.5.0 — animações de trabalho
+- Zé ganhou estados visuais de conserto, diagnóstico, reabastecimento e cansaço;
+- ajudante muda automaticamente entre animação de conserto, diagnóstico e transporte de peça conforme a IA;
+- novo spritesheet `assets/sprites/actions.png` com chave, scanner, pneu e caixa de ferramentas;
+- ações usam animação curta sem alterar hitbox, velocidade ou regras de economia;
+- fallback procedural e sprites direcionais anteriores continuam ativos;
+- PWA atualizado para cache v7 incluindo o novo asset.
