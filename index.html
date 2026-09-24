@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Mecânica do Zé</title>
+
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1a1a2e">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="icon" type="image/png" href="icon-192.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323:wght@400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/game.css">
+<link rel="stylesheet" href="css/mobile.css">
+</head>
+<body>
+<div id="daynight"></div>
+<canvas id="game"></canvas>
+
+<div id="hud">
+  <div class="hud-box"><span class="hud-label">💰 GRANA</span><span class="hud-value" id="money">$200</span></div>
+  <div class="hud-box blue"><span class="hud-label">🕐 HORA</span><span class="hud-value" id="gametime">08:00</span></div>
+  <div class="hud-box green" style="flex-direction:column;align-items:flex-start;min-width:180px;">
+    <span class="hud-label">⭐ FAMA</span>
+    <span class="hud-value" id="rep" style="font-size:13px;">🪨 0 — Desconhecida</span>
+    <div style="display:flex;align-items:center;gap:5px;margin-top:3px;width:100%">
+      <div style="flex:1;height:5px;background:rgba(0,0,0,0.5);border-radius:3px;overflow:hidden;">
+        <div id="fame-bar-fill" style="height:100%;width:0%;border-radius:3px;transition:width 0.4s;"></div>
+      </div>
+    </div>
+    <span id="fame-next" style="font-size:9px;color:#888;margin-top:1px;"></span>
+  </div>
+  <div class="hud-box"><span class="hud-label">🚗 CARROS</span><span class="hud-value" id="carcount">0</span></div>
+  <div class="hud-box purple"><span class="hud-label">🔧 CONSERTOS</span><span class="hud-value" id="fixcount">0</span></div>
+  <div class="hud-box red"><span class="hud-label">📦 PEÇAS</span><span class="hud-value" id="partscount">20</span></div>
+  <div class="hud-box" id="weather-hud-box" style="min-width:110px;"><span class="hud-label">🌤 CLIMA</span><span class="hud-value" id="weather-hud" style="font-size:12px;">☀️ Limpo</span></div>
+  <div class="hud-box orange" style="flex-direction:column;align-items:flex-start;min-width:100px;">
+    <span class="hud-label">🍔 FOME</span>
+    <div style="width:100%;height:6px;background:rgba(0,0,0,0.5);border-radius:3px;overflow:hidden;margin-top:4px;">
+      <div id="hunger-fill" style="height:100%;width:100%;border-radius:3px;background:#84cc16;transition:width 0.3s;"></div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<button id="missions-toggle" onclick="toggleMissions()">MISSÕES</button>
+<div id="task-board">
+  <h4>📋 MISSÕES</h4>
+  <div id="tasks-list"></div>
+</div>
+
+<button id="bills-toggle" onclick="toggleBillsPanel()">CONTAS</button>
+<div id="bills-panel">
+  <h4>💸 CONTAS DA OFICINA</h4>
+  <div id="bills-content"></div>
+  <button id="bills-pay-btn" onclick="payAllBills()">&#x1F4B0; PAGAR TUDO</button>
+</div>
+
+<div id="upgrade-tabs">
+  <button class="upg-tab-btn active" id="tab-btn-oficina" onclick="switchUpgradeTab('oficina')">🔧 OFICINA</button>
+  <button class="upg-tab-btn"        id="tab-btn-negocio" onclick="switchUpgradeTab('negocio')">🏪 NEGÓCIO</button>
+  <button class="upg-tab-btn"        id="tab-btn-equipe"  onclick="switchUpgradeTab('equipe')">👷 EQUIPE</button>
+</div>
+<div id="upgrade-panel">
+  <h3 id="upgrade-panel-title">🔧 OFICINA</h3>
+  <div id="upgrade-panel-body"></div>
+</div>
+
+<div id="stamina-bar"><span id="stamina-label">⚡</span><div id="stamina-track"><div id="stamina-fill" style="width:100%"></div></div></div>
+<div id="controls">WASD · Mover &nbsp;|&nbsp; ESPAÇO/F · Consertar &nbsp;|&nbsp; E · Diagnosticar/Loja &nbsp;|&nbsp; Q · Diagnosticar &nbsp;|&nbsp; R · Reabastecer &nbsp;|&nbsp; 1/2/3 · Comer</div>
+<button id="fs-btn" title="Tela cheia">⛶ TELA CHEIA</button>
+
+<!-- MAIN MENU -->
+<div id="main-menu" style="display:flex;">
+  <div class="menu-bg-anim"></div>
+  <div class="menu-content">
+    <div class="logo">🔧 MECÂNICA<br>DO ZÉ</div>
+    <div class="logo-sub">SIMULADOR DE OFICINA</div>
+    <div class="menu-buttons-grid">
+      <button class="menu-btn green" onclick="openSaveScreen('load')">▶ JOGAR</button>
+      <button class="menu-btn" onclick="openSaveScreen('new')">✦ NOVO JOGO</button>
+      <button class="menu-btn amber" onclick="openDifficulty()">⚙️ DIFICULDADE</button>
+      <button class="menu-btn blue" onclick="openAchievements()">🏆 CONQUISTAS</button>
+      <button class="menu-btn purple" onclick="openOptions()">🎮 OPÇÕES</button>
+      <button class="menu-btn" onclick="showTutorialFromMenu()">📋 COMO JOGAR</button>
+      <button class="menu-btn gold" onclick="openCredits()">👤 CRÉDITOS</button>
+      <button class="menu-btn dark" onclick="toggleFS()">⛶ TELA CHEIA</button>
+    </div>
+    <div class="menu-version">v2.3.1 — Mecânica do Zé</div>
+  </div>
+</div>
+
+<!-- DIFFICULTY SCREEN -->
+<div id="difficulty-screen">
+  <div class="overlay-panel">
+    <h2 class="panel-title">⚙️ DIFICULDADE</h2>
+    <p class="panel-subtitle">Escolha o desafio da sua oficina</p>
+    <div class="diff-grid">
+      <div class="diff-card" data-diff="facil" onclick="selectDifficulty('facil')">
+        <div class="diff-icon">😊</div>
+        <div class="diff-name">FÁCIL</div>
+        <div class="diff-desc">Clientes super pacientes. Peças baratas. Ideal para aprender.</div>
+        <ul class="diff-stats">
+          <li>⏱ Paciência +50%</li>
+          <li>💰 Peças -30%</li>
+          <li>🚗 Carros moderados</li>
+        </ul>
+      </div>
+      <div class="diff-card active" data-diff="normal" onclick="selectDifficulty('normal')">
+        <div class="diff-icon">🔧</div>
+        <div class="diff-name">NORMAL</div>
+        <div class="diff-desc">A experiência balanceada. Para quem gosta de um bom desafio.</div>
+        <ul class="diff-stats">
+          <li>⏱ Paciência padrão</li>
+          <li>💰 Peças padrão</li>
+          <li>🚗 Fluxo normal</li>
+        </ul>
+        <div class="diff-badge">PADRÃO</div>
+      </div>
+      <div class="diff-card" data-diff="dificil" onclick="selectDifficulty('dificil')">
+        <div class="diff-icon">💀</div>
+        <div class="diff-name">DIFÍCIL</div>
+        <div class="diff-desc">Clientes estressados. Peças caras. Não é para qualquer um!</div>
+        <ul class="diff-stats">
+          <li>⏱ Paciência -35%</li>
+          <li>💰 Peças +50%</li>
+          <li>🚗 Fluxo intenso</li>
+        </ul>
+      </div>
+      <div class="diff-card" data-diff="insano" onclick="selectDifficulty('insano')">
+        <div class="diff-icon">🔥</div>
+        <div class="diff-name">INSANO</div>
+        <div class="diff-desc">Caos total. Estoque nunca é suficiente. Apenas os lendários sobrevivem.</div>
+        <ul class="diff-stats">
+          <li>⏱ Paciência -60%</li>
+          <li>💰 Peças +120%</li>
+          <li>🚗 Fluxo caótico</li>
+        </ul>
+        <div class="diff-badge danger">EXTREMO</div>
+      </div>
+    </div>
+    <button class="menu-btn red back-btn" onclick="closeDifficulty()">← VOLTAR</button>
+  </div>
+</div>
+
+<!-- ACHIEVEMENTS SCREEN -->
+<div id="achievements-screen">
+  <div class="overlay-panel">
+    <h2 class="panel-title">🏆 CONQUISTAS</h2>
+    <p class="panel-subtitle">Seus feitos na Mecânica do Zé</p>
+    <div class="achievements-grid" id="achievements-list"></div>
+    <div class="ach-progress-bar-wrap">
+      <span class="ach-progress-label" id="ach-progress-text">0 / 12 desbloqueadas</span>
+      <div class="ach-progress-track"><div class="ach-progress-fill" id="ach-progress-fill"></div></div>
+    </div>
+    <button class="menu-btn red back-btn" onclick="closeAchievements()">← VOLTAR</button>
+  </div>
+</div>
+
+<!-- OPTIONS SCREEN -->
+<div id="options-screen">
+  <div class="overlay-panel">
+    <h2 class="panel-title">🎮 OPÇÕES</h2>
+    <div class="options-sections">
+      <!-- GRAPHICS -->
+      <div class="opt-section">
+        <div class="opt-section-title">🖥️ GRÁFICOS</div>
+        <div class="opt-row">
+          <span class="opt-label">Qualidade</span>
+          <div class="opt-buttons" id="quality-btns">
+            <button class="opt-pill" onclick="setGraphicsQuality('baixa')">BAIXA</button>
+            <button class="opt-pill active" onclick="setGraphicsQuality('media')">MÉDIA</button>
+            <button class="opt-pill" onclick="setGraphicsQuality('alta')">ALTA</button>
+          </div>
+        </div>
+        <div class="opt-row">
+          <span class="opt-label">Partículas</span>
+          <div class="opt-buttons" id="particles-btns">
+            <button class="opt-pill" onclick="setParticles('desligado')">DESLIGADO</button>
+            <button class="opt-pill active" onclick="setParticles('ligado')">LIGADO</button>
+          </div>
+        </div>
+        <div class="opt-row">
+          <span class="opt-label">Vinheta</span>
+          <div class="opt-buttons" id="vignette-btns">
+            <button class="opt-pill" onclick="setVignette('desligado')">DESLIGADO</button>
+            <button class="opt-pill active" onclick="setVignette('ligado')">LIGADO</button>
+          </div>
+        </div>
+      </div>
+      <!-- SCREEN RATIO -->
+      <div class="opt-section">
+        <div class="opt-section-title">📐 PROPORÇÃO DE TELA</div>
+        <div class="opt-row">
+          <span class="opt-label">Proporção</span>
+          <div class="opt-buttons" id="ratio-btns">
+            <button class="opt-pill active" onclick="setAspectRatio('livre')">LIVRE</button>
+            <button class="opt-pill" onclick="setAspectRatio('16:9')">16:9</button>
+            <button class="opt-pill" onclick="setAspectRatio('4:3')">4:3</button>
+            <button class="opt-pill" onclick="setAspectRatio('21:9')">21:9</button>
+          </div>
+        </div>
+      </div>
+      <!-- SOUND -->
+      <div class="opt-section">
+        <div class="opt-section-title">🔊 SONS</div>
+        <div class="opt-row">
+          <span class="opt-label">Volume Geral</span>
+          <div class="opt-slider-wrap">
+            <input type="range" id="opt-vol-master" min="0" max="100" value="70" oninput="setMasterVolume(this.value)">
+            <span class="opt-val" id="opt-vol-master-val">70%</span>
+          </div>
+        </div>
+        <div class="opt-row">
+          <span class="opt-label">Efeitos</span>
+          <div class="opt-slider-wrap">
+            <input type="range" id="opt-vol-sfx" min="0" max="100" value="80" oninput="setSfxVolume(this.value)">
+            <span class="opt-val" id="opt-vol-sfx-val">80%</span>
+          </div>
+        </div>
+        <div class="opt-row">
+          <span class="opt-label">Ambiente</span>
+          <div class="opt-slider-wrap">
+            <input type="range" id="opt-vol-amb" min="0" max="100" value="50" oninput="setAmbientVolume(this.value)">
+            <span class="opt-val" id="opt-vol-amb-val">50%</span>
+          </div>
+        </div>
+        <div class="opt-row">
+          <span class="opt-label">Mudo</span>
+          <div class="opt-buttons" id="mute-btns">
+            <button class="opt-pill" onclick="setMuteAll(true)">SIM</button>
+            <button class="opt-pill active" onclick="setMuteAll(false)">NÃO</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <button class="menu-btn red back-btn" onclick="closeOptions()">← VOLTAR</button>
+  </div>
+</div>
+
+<!-- CREDITS SCREEN -->
+<div id="credits-screen">
+  <div class="credits-container">
+    <div class="credits-header">
+      <div class="credits-logo">🔧 MECÂNICA DO ZÉ</div>
+      <div class="credits-version">Versão 2.3.1</div>
+    </div>
+    <div class="credits-scroll-wrap">
+      <div class="credits-scroll" id="credits-scroll">
+        <div class="credits-section-label">DESENVOLVIDO POR</div>
+        <div class="credits-name-big">LUIS PAULO ALVES</div>
+        <div class="credits-role">Game Designer & Programador</div>
+
+        <div class="credits-divider">✦</div>
+
+        <div class="credits-section-label">DESIGN & ARTE</div>
+        <div class="credits-name">Luis Paulo Alves</div>
+
+        <div class="credits-divider">✦</div>
+
+        <div class="credits-section-label">PROGRAMAÇÃO</div>
+        <div class="credits-name">Luis Paulo Alves</div>
+        <div class="credits-sub">Engine, Sistemas de Jogo, IA</div>
+
+        <div class="credits-divider">✦</div>
+
+        <div class="credits-section-label">ÁUDIO</div>
+        <div class="credits-name">Web Audio API</div>
+        <div class="credits-sub">Todos os sons gerados proceduralmente</div>
+
+        <div class="credits-divider">✦</div>
+
+        <div class="credits-section-label">TECNOLOGIAS</div>
+        <div class="credits-name">HTML5 Canvas</div>
+        <div class="credits-name">JavaScript Vanilla</div>
+        <div class="credits-name">Web Audio API</div>
+        <div class="credits-name">localStorage</div>
+
+        <div class="credits-divider">✦</div>
+
+        <div class="credits-section-label">FONTES</div>
+        <div class="credits-name">Press Start 2P</div>
+        <div class="credits-name">VT323</div>
+        <div class="credits-sub">Google Fonts</div>
+
+        <div class="credits-divider">✦</div>
+
+        <div class="credits-section-label">AGRADECIMENTOS ESPECIAIS</div>
+        <div class="credits-name">A todos os jogadores!</div>
+        <div class="credits-sub">Obrigado por jogar a Mecânica do Zé</div>
+
+        <div class="credits-divider big">⚙️</div>
+
+        <div class="credits-copyright">© 2025 Luis Paulo Alves</div>
+        <div class="credits-tagline">"Consertando carros desde o dia 1"</div>
+
+        <div style="height:80px"></div>
+      </div>
+    </div>
+    <button class="menu-btn red back-btn credits-back" onclick="closeCredits()">← VOLTAR</button>
+  </div>
+</div>
+
+<!-- SAVE SCREEN -->
+<div id="save-screen">
+  <h2 id="save-title">SELECIONAR SLOT</h2>
+  <div class="save-slots" id="save-slots-list"></div>
+  <button class="menu-btn red" id="save-back" onclick="closeSaveScreen()">← VOLTAR</button>
+</div>
+
+<!-- PAUSE MENU -->
+<div id="pause-menu">
+  <h2>⏸ PAUSADO</h2>
+  <button class="menu-btn green" onclick="resumeGame()">▶ CONTINUAR</button>
+  <button class="menu-btn" onclick="openSaveScreen('save')">💾 SALVAR JOGO</button>
+  <button class="menu-btn" onclick="showTutorialFromPause()">📋 COMO JOGAR</button>
+
+  <!-- Controles de Rádio — aparece só se o rádio foi comprado -->
+  <div id="pause-radio-section" style="display:none; width:260px; margin:6px 0; padding:8px 12px; background:rgba(255,255,255,0.07); border:1px solid #e8820a55; border-radius:8px; box-sizing:border-box;">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+      <span style="font-family:'Press Start 2P',monospace; font-size:7px; color:#fbbf24;">📻 Rádio</span>
+      <button id="pause-radio-toggle" onclick="togglePauseRadio()" style="font-family:'Press Start 2P',monospace;font-size:7px;padding:4px 8px;border-radius:5px;border:1px solid #34d399;color:#34d399;background:rgba(0,0,0,0.4);cursor:pointer;white-space:nowrap;">🔈 Ligar</button>
+    </div>
+    <div style="display:flex; align-items:center; gap:8px;">
+      <span style="font-family:'Press Start 2P',monospace; font-size:6px; color:#fbbf24; opacity:0.7;">VOL</span>
+      <input id="pause-radio-vol" type="range" min="0" max="100" value="70"
+        style="flex:1; accent-color:#f0a500; cursor:pointer; height:4px;"
+        oninput="setPauseRadioVolume(this.value); this.style.setProperty('--rv', this.value+'%')"
+        title="Volume do Rádio">
+      <span id="pause-radio-vol-label" style="font-family:'Press Start 2P',monospace; font-size:6px; color:#fbbf24; min-width:28px; text-align:right;">70%</span>
+    </div>
+  </div>
+
+  <button class="menu-btn red" onclick="returnToMenu()">🏠 MENU PRINCIPAL</button>
+</div>
+
+<!-- TUTORIAL -->
+<div id="tutorial" style="display:none;">
+  <div id="tutorial-box">
+    <h2>🔧 COMO JOGAR 🔧</h2>
+    <h3>📋 OBJETIVO</h3>
+    <div class="tut-row">Gerencie sua oficina! Diagnostique e conserte carros antes que os clientes percam a paciência.</div>
+    <h3>🕹️ MOVIMENTAÇÃO</h3>
+    <div class="tut-row"><span class="tut-key">W A S D</span> ou <span class="tut-key">↑ ← ↓ →</span> Mover o mecânico</div>
+    <h3>🔧 AÇÕES (perto de um carro)</h3>
+    <div class="tut-row"><span class="tut-key">E</span> Diagnosticar / Abrir Loja de Peças</div>
+    <div class="tut-row"><span class="tut-key">Q</span> Diagnosticar o problema</div>
+    <div class="tut-row"><span class="tut-key">ESPAÇO</span> ou <span class="tut-key">F</span> Consertar (repita várias vezes)</div>
+    <div class="tut-row"><span class="tut-key">R</span> Reabastecer peças 📦</div>
+    <div class="tut-row"><span class="tut-key">1/2/3</span> Comer na cantina 🍔</div>
+    <div class="tut-row"><span class="tut-key">ESC</span> Pausar o jogo</div>
+    <h3>🚗 VEÍCULOS v2.0</h3>
+    <div class="tut-row">• 🏍️ Motos — rápidas, pagam menos</div>
+    <div class="tut-row">• 🚚 Caminhões — demoram mais, pagam muito!</div>
+    <div class="tut-row">• 🏎️ Luxo — clientes VIP, alto pagamento</div>
+    <h3>⚠️ ATENÇÃO</h3>
+    <div class="tut-row">• Loja abre às 08:00 e fecha às 20:00</div>
+    <div class="tut-row">• Clientes vão embora se esperar demais!</div>
+    <div class="tut-row">• Barra ⚡ = stamina &nbsp;|&nbsp; 🍔 = fome — cuide dos dois!</div>
+    <div class="tut-row">• 🌧️ Chuva = mais carros com aquaplanagem!</div>
+    <div class="tut-row">• 😤 Apressado: pague bônus se for rápido!</div>
+    <button class="start-btn" id="tut-close-btn" onclick="closeTutorial()">✔ ENTENDI</button>
+  </div>
+</div>
+
+<!-- SAVE INDICATOR -->
+<div id="save-indicator">💾 Salvo!</div>
+
+<!-- SOUND CONTROLS -->
+<div id="sound-ctrl">
+  <button id="sound-toggle" title="Mudo/Som">🔊</button>
+  <input id="vol-slider" type="range" min="0" max="100" value="70" title="Volume" style="--v:70%">
+</div>
+
+
+    
+<!-- PARTS SHOP MODAL -->
+<div id="parts-shop-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:200;display:none;align-items:center;justify-content:center;">
+  <div class="overlay-panel" style="max-width:600px;width:90%;">
+    <h2 class="panel-title">🏪 LOJA DE PEÇAS</h2>
+    <p class="panel-subtitle">Compre peças específicas para cada problema</p>
+    <div id="parts-shop-body" style="max-height:60vh;overflow-y:auto;"></div>
+    <div style="margin-top:10px;color:#888;font-size:11px;text-align:center;">💰 Saldo: <span id="shop-balance" style="color:#fbbf24;">$200</span></div>
+    <button class="menu-btn red back-btn" onclick="closePartsShop()">✕ FECHAR</button>
+  </div>
+</div>
+
+<!-- DAY REPORT MODAL -->
+<div id="day-report-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:200;align-items:center;justify-content:center;">
+  <div class="overlay-panel" style="max-width:440px;width:90%;text-align:center;">
+    <h2 class="panel-title">📊 RELATÓRIO DO DIA</h2>
+    <div id="day-report-content"></div>
+    <button class="menu-btn green back-btn" style="margin-top:18px;" onclick="closeDayReport()">▶ CONTINUAR</button>
+  </div>
+</div>
+
+<!-- Parts shop hint (canvas overlay) -->
+<div id="parts-shop-hint" style="display:none;position:absolute;bottom:80px;right:20px;background:rgba(0,0,0,0.8);border:1px solid #22c55e;padding:8px 14px;border-radius:6px;color:#22c55e;font-family:'VT323';font-size:14px;">🏪 Loja de Peças desbloqueada! Vá até o balcão verde.</div>
+<div id="cantine-hint" style="display:none;position:absolute;bottom:110px;right:20px;background:rgba(0,0,0,0.8);border:1px solid #fbbf24;padding:8px 14px;border-radius:6px;color:#fbbf24;font-family:'VT323';font-size:14px;">🍔 Cantina desbloqueada! Pressione 1/2/3 perto dela para comer.</div>
+
+    <!-- ── Infraestrutura (sem dependências) ─────────────────────── -->
+
+    <!-- ── Sistemas autônomos (dependem de EventBus) ─────────────── -->
+
+    <!-- ── Sistemas de suporte ────────────────────────────────────── -->
+
+    <!-- ── UI / Menu ─────────────────────────────────────────────── -->
+
+    <!-- ── IA do ajudante ────────────────────────────────────────── -->
+
+    <!-- ── Engine principal ──────────────────────────────────────── -->
+<script src="js/game.js"></script>
+
+<script src="js/pwa.js"></script>
+
+<!-- ===== MOBILE CONTROLS ===== -->
+<div id="rotate-device" aria-live="polite">
+  <div class="rotate-card"><div class="rotate-icon">📱↻</div><strong>GIRE O CELULAR</strong><span>O Mecânica do Zé foi feito para jogar na horizontal.</span></div>
+</div>
+
+
+<div id="mobile-controls">
+  <!-- Joystick -->
+  <div id="joy-zone">
+    <div id="joy-base"></div>
+    <div id="joy-stick"></div>
+    <!-- Direction indicators -->
+    <div id="dpad-up"    class="dpad-arrow">▲</div>
+    <div id="dpad-down"  class="dpad-arrow">▼</div>
+    <div id="dpad-left"  class="dpad-arrow">◀</div>
+    <div id="dpad-right" class="dpad-arrow">▶</div>
+  </div>
+
+  <!-- Pause -->
+  <button id="btn-pause-mob">⏸</button>
+
+  <!-- Action Buttons -->
+  <div id="action-btns">
+    <button class="mob-btn" id="btn-fix">
+      <span class="mob-icon">🔧</span>CONSERTAR
+    </button>
+    <button class="mob-btn" id="btn-diag">
+      <span class="mob-icon">🔍</span>DIAGNOSE
+    </button>
+    <button class="mob-btn" id="btn-shop">
+      <span class="mob-icon">🏪</span>LOJA/COMER
+    </button>
+    <button class="mob-btn" id="btn-rest">
+      <span class="mob-icon">📦</span>REABASTECER
+    </button>
+  </div>
+</div>
+
+<script src="js/mobile-controls.js"></script>
+</body>
+</html>
