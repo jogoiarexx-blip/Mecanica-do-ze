@@ -1325,11 +1325,52 @@ function drawHelperStateIcon(h) {
  var pulse = 0.65 + 0.35 * Math.sin(tick * 0.16);
  ctx.save(); ctx.globalAlpha = pulse;
  ctx.font = '13px sans-serif'; ctx.textAlign = 'center';
- ctx.fillText(icon, tx(h.x + h.w/2), ty(h.y - 14));
+ ctx.fillText(icon, tx(h.x + h.w/2), ty(h.y - 34));
  ctx.restore();
 }
 const canvas=document.getElementById("game");
 const ctx=canvas.getContext("2d");
+const CHARACTER_SPRITES = (() => {
+ const makeAsset = (src) => {
+  const image = new Image();
+  const asset = { image, ready:false, failed:false, src };
+  image.decoding = "async";
+  image.onload = () => { asset.ready = true; };
+  image.onerror = () => { asset.failed = true; console.warn(`[sprites] Falha ao carregar ${src}; usando personagem procedural.`); };
+  image.src = src;
+  return asset;
+ };
+ return {
+  cellW:24, cellH:32,
+  rows:{down:0,up:1,left:2,right:3},
+  ze:makeAsset("./assets/sprites/ze.png"),
+  helper:makeAsset("./assets/sprites/ajudante.png")
+ };
+})();
+function drawCharacterSprite(entity, kind, active=true){
+ const asset = CHARACTER_SPRITES[kind];
+ if(!asset || !asset.ready || asset.failed) return false;
+ const row = CHARACTER_SPRITES.rows[entity.dir] ?? 0;
+ const frame = active ? Math.abs(entity.frame||0)%4 : 0;
+ const drawW = kind === "ze" ? 42 : 40;
+ const drawH = kind === "ze" ? 56 : 54;
+ const cx = tx(entity.x + entity.w/2);
+ const footY = ty(entity.y + entity.h + 2);
+ ctx.save();
+ ctx.imageSmoothingEnabled = false;
+ ctx.fillStyle = "rgba(0,0,0,0.30)";
+ ctx.beginPath();
+ ctx.ellipse(Math.round(cx),Math.round(footY-1),Math.round(drawW*0.34),4,0,0,Math.PI*2);
+ ctx.fill();
+ ctx.drawImage(
+  asset.image,
+  frame*CHARACTER_SPRITES.cellW,row*CHARACTER_SPRITES.cellH,
+  CHARACTER_SPRITES.cellW,CHARACTER_SPRITES.cellH,
+  Math.round(cx-drawW/2),Math.round(footY-drawH),drawW,drawH
+ );
+ ctx.restore();
+ return true;
+}
 function resize(){ if (typeof applyAspectRatio === 'function') applyAspectRatio(currentRatio); }
 resize();window.addEventListener("resize",resize);
 window.addEventListener("orientationchange",()=>setTimeout(resize,120));
@@ -3101,7 +3142,7 @@ function drawPerson(px2,py2,pw,ph,skin,shirt,dir,frame,isHelper=false){
  }
 }
 function drawPlayer(){
- drawPerson(player.x,player.y,player.w,player.h,"#f5cba7","#b45309",player.dir,player.frame,false);
+ if(!drawCharacterSprite(player,"ze",moving)) drawPerson(player.x,player.y,player.w,player.h,"#f5cba7","#b45309",player.dir,player.frame,false);
  const nameX=tx(player.x+player.w/2);const nameY=ty(player.y-28);
  ctx.fillStyle="rgba(0,0,0,0.8)";ctx.fillRect(nameX-20,nameY,40,15);
  const glowPulse=0.6+0.4*Math.sin(tick*0.1);
@@ -3112,7 +3153,8 @@ function drawPlayer(){
 }
 function drawHelpers(){
  helpers.forEach(h=>{
- drawPerson(h.x,h.y,h.w,h.h,"#fdbcb4","#3b82f6",h.dir,h.frame,true);
+ const helperActive = h.state !== HELPER_STATES.IDLE || !!h.patrolTarget;
+ if(!drawCharacterSprite(h,"helper",helperActive)) drawPerson(h.x,h.y,h.w,h.h,"#fdbcb4","#3b82f6",h.dir,h.frame,true);
  drawHelperStateIcon(h);
  drawHelperSpeech(h);
  });
