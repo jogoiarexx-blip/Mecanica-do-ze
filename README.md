@@ -1,4 +1,4 @@
-# Mecânica do Zé v2.6.0 — Correções PC + Celular
+# Mecânica do Zé v2.7.0 — Correções PC + Celular
 
 Esta versão parte da v2.2 original e mantém o conteúdo do jogo, mas reorganiza o projeto em CSS/JS separados.
 
@@ -77,3 +77,13 @@ Estrutura:
 - ajudante também se posiciona no ponto exato e fica orientado para o veículo;
 - hitboxes, custos, peças e progresso de reparo permanecem iguais à v2.5.0;
 - PWA atualizado para cache v8.
+
+
+## v2.7.0 — veículo reage ao defeito
+- veículo exibe feedback visual por tipo de defeito durante diagnóstico e conserto;
+- capô/área do motor abre para Motor, Óleo, Bateria, Elétrica, Correia, Radiador e Superaquecimento;
+- Pneu/Freio/Aquaplanagem mostram roda em serviço e cavalete;
+- Elétrica usa faíscas, Radiador/Superaquecimento usam vapor, Óleo usa vazamento, Farol pisca e Transmissão ganha conjunto mecânico próprio;
+- carro mostra indicador EM SERVIÇO enquanto Zé ou ajudante estão atuando;
+- efeitos acompanham o veículo sem mudar hitbox, economia ou tempo de reparo;
+- PWA atualizado para cache v9.
