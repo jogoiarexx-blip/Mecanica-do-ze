@@ -1448,7 +1448,7 @@ const CANTINA_SPRITE=(()=>{
  image.decoding="async";
  image.onload=()=>{asset.ready=true;};
  image.onerror=()=>{asset.failed=true;console.warn("[sprites] Falha ao carregar a cantina; usando fallback procedural.");};
- image.src=window.CANTINA_SPRITE_SRC||"";
+ image.src="./assets/sprites/cantina.webp";
  return asset;
 })();
 let playerAction=null, playerActionTimer=0;
