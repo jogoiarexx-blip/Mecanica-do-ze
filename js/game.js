@@ -2037,12 +2037,28 @@ const UPGRADE_TAB_TITLES = {
 };
 let _currentUpgradeTab = "oficina";
 function switchUpgradeTab(tab) {
+ const panel = document.getElementById("upgrade-panel");
+ if(!panel)return;
+ const sameTab = _currentUpgradeTab === tab;
+ const isOpen = panel.classList.contains("open");
+ if(sameTab && isOpen){
+   panel.classList.remove("open");
+   ["oficina","negocio","equipe"].forEach(t=>{
+     const btn=document.getElementById("tab-btn-"+t);
+     if(btn){btn.classList.remove("active");btn.setAttribute("aria-expanded","false");}
+   });
+   SFX.uiClick();
+   return;
+ }
  _currentUpgradeTab = tab;
  ["oficina","negocio","equipe"].forEach(t => {
- const btn = document.getElementById("tab-btn-" + t);
- if (btn) btn.classList.toggle("active", t === tab);
+   const btn = document.getElementById("tab-btn-" + t);
+   if(btn){
+     const active=t===tab;
+     btn.classList.toggle("active",active);
+     btn.setAttribute("aria-expanded",active?"true":"false");
+   }
  });
- const panel = document.getElementById("upgrade-panel");
  panel.classList.add("open");
  renderUpgradePanel();
  SFX.uiClick();
