@@ -1,7 +1,7 @@
 name: Validate game
 on:
   push:
-    branches: [main]
+    branches: [main, v3.1.1-cantina]
   workflow_dispatch:
 permissions:
   contents: read
@@ -15,6 +15,7 @@ jobs:
           node-version: '22'
       - name: JavaScript syntax
         run: |
+          node --check assets/sprites/cantina-data.js
           node --check js/game-config.js
           node --check js/game.js
           node --check js/repair-systems.js
@@ -52,7 +53,11 @@ jobs:
           assert '_playerRepairSpeedMult=1.25' in js
           assert 'devicePixelRatio' in js and 'moveMag=Math.hypot(dx,dy)' in js
           assert 'function drawRepairVehicleVisuals' in repair
-          assert 'mecanica-ze-v14' in sw
+          assert 'mecanica-ze-v15' in sw
+          assert './assets/sprites/cantina-data.js' in sw
+          assert 'const CANTINA_SPRITE' in js
+          assert 'const cantineArea={x:380,y:815,w:200,h:175}' in js
+          assert 'CANTINA_SPRITE_SRC' in Path('assets/sprites/cantina-data.js').read_text(encoding='utf-8')
           assert 'SKIP_WAITING' in sw
           assert not Path('ico1000.png').exists()
           print('OK: v3.1 regression guards')
