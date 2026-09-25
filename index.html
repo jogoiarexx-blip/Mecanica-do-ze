@@ -90,7 +90,7 @@
       <button class="menu-btn gold" onclick="openCredits()">👤 CRÉDITOS</button>
       <button class="menu-btn dark" onclick="toggleFS()">⛶ TELA CHEIA</button>
     </div>
-    <div class="menu-version">v2.9.0 — Mecânica do Zé</div>
+    <div class="menu-version">v3.0.0 — Mecânica do Zé</div>
   </div>
 </div>
 
@@ -389,6 +389,17 @@
   </div>
 </div>
 
+<!-- CANTINA MENU MODAL -->
+<div id="cantine-menu-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.86);z-index:205;align-items:center;justify-content:center;">
+  <div class="overlay-panel cantine-menu-panel" style="max-width:520px;width:92%;">
+    <h2 class="panel-title">🍔 CANTINA</h2>
+    <p class="panel-subtitle">Escolha o que o Zé vai consumir</p>
+    <div id="cantine-menu-body" class="cantine-menu-body"></div>
+    <div class="cantine-balance">💰 Saldo: <span id="cantine-balance">$200</span></div>
+    <button class="menu-btn red back-btn" onclick="closeFoodMenu()">✕ FECHAR</button>
+  </div>
+</div>
+
 <!-- DAY REPORT MODAL -->
 <div id="day-report-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:200;align-items:center;justify-content:center;">
   <div class="overlay-panel" style="max-width:440px;width:90%;text-align:center;">
@@ -400,7 +411,7 @@
 
 <!-- Parts shop hint (canvas overlay) -->
 <div id="parts-shop-hint" style="display:none;position:absolute;bottom:80px;right:20px;background:rgba(0,0,0,0.8);border:1px solid #22c55e;padding:8px 14px;border-radius:6px;color:#22c55e;font-family:'VT323';font-size:14px;">🏪 Loja de Peças desbloqueada! Vá até o balcão verde.</div>
-<div id="cantine-hint" style="display:none;position:absolute;bottom:110px;right:20px;background:rgba(0,0,0,0.8);border:1px solid #fbbf24;padding:8px 14px;border-radius:6px;color:#fbbf24;font-family:'VT323';font-size:14px;">🍔 Cantina desbloqueada! Pressione 1/2/3 perto dela para comer.</div>
+<div id="cantine-hint" style="display:none;position:absolute;bottom:110px;right:20px;background:rgba(0,0,0,0.8);border:1px solid #fbbf24;padding:8px 14px;border-radius:6px;color:#fbbf24;font-family:'VT323';font-size:14px;">🍔 Cantina desbloqueada! Use 1/2/3 no PC ou abra COMER no celular.</div>
 
     <!-- ── Infraestrutura (sem dependências) ─────────────────────── -->
 
@@ -413,7 +424,9 @@
     <!-- ── IA do ajudante ────────────────────────────────────────── -->
 
     <!-- ── Engine principal ──────────────────────────────────────── -->
+<script src="js/game-config.js"></script>
 <script src="js/game.js"></script>
+<script src="js/repair-systems.js"></script>
 
 <script src="js/pwa.js"></script>
 
