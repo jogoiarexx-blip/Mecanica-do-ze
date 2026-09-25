@@ -2388,6 +2388,15 @@ function doEat(itemIdx){
  return true;
 }
 window.doEat=doEat;
+function renderFoodMenu(){
+ const body=document.getElementById('cantine-menu-body');if(!body)return;
+ body.innerHTML=foodItems.map((item,i)=>`<button class="food-choice" onclick="buyFoodFromMenu(${i})"><span>${item.name}</span><small>+${item.hunger} fome${item.stamina||item.staminaBonus?` · +${item.stamina||item.staminaBonus}⚡`:''}</small><b>$${item.cost}</b></button>`).join('');
+ const bal=document.getElementById('cantine-balance');if(bal)bal.textContent='$'+money;
+}
+function openFoodMenu(){if(!nearCantine()){showToast('Vá até a Cantina! 🍔');return;}renderFoodMenu();const m=document.getElementById('cantine-menu-modal');if(m)m.style.display='flex';}
+function closeFoodMenu(){const m=document.getElementById('cantine-menu-modal');if(m)m.style.display='none';}
+function buyFoodFromMenu(i){if(doEat(i)){renderFoodMenu();}}
+window.openFoodMenu=openFoodMenu;window.closeFoodMenu=closeFoodMenu;window.buyFoodFromMenu=buyFoodFromMenu;
 window.openPartsShop=openPartsShop;
 function spawnParticles(x,y,color,n=6){
  if(!particlesEnabled) return;
