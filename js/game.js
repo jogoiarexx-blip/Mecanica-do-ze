@@ -3584,6 +3584,7 @@ function update(){
   if(keys["a"]||keys["arrowleft"])dx=-1;
   if(keys["d"]||keys["arrowright"]){if(!keys["arrowleft"])dx=1;}
   if(joyDX||joyDY){dx=joyDX;dy=joyDY;}
+  const moveMag=Math.hypot(dx,dy);if(moveMag>1){dx/=moveMag;dy/=moveMag;}
   moving=dx!==0||dy!==0;
   if(moving){
    const spd=playerSpeed*(stamina>0?1:0.4)*(hunger>20?1:0.7);
