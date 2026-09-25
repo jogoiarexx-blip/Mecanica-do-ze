@@ -20,6 +20,10 @@ with sync_playwright() as p:
     assert chain['a']==chain['b'] and len(chain['a'])==2,chain
     bills=page.evaluate("""() => {BillsSystem.reset();BillsSystem.applySaveData({lastBillDay:6,billsPaid:false,billsDue:true,latePenaltyApplied:false});money=0;reputation=100;BillsSystem.payAll();const a=reputation;BillsSystem.payAll();return [a,reputation];}""")
     assert bills==[70,70],bills
+    cantina_sprite=page.evaluate("""() => ({ready:CANTINA_SPRITE.ready,failed:CANTINA_SPRITE.failed,w:CANTINA_SPRITE.image.naturalWidth,h:CANTINA_SPRITE.image.naturalHeight,area:{...cantineArea}})""")
+    assert cantina_sprite['ready'] and not cantina_sprite['failed'],cantina_sprite
+    assert [cantina_sprite['w'],cantina_sprite['h']]==[114,100],cantina_sprite
+    assert [cantina_sprite['area']['w'],cantina_sprite['area']['h']]==[200,175],cantina_sprite
     assert not errs,errs
     browser.close()
-print(json.dumps({'ok':True,'checks':['shop-lock','overlay-freeze','queue','chain-stable','bill-once']},ensure_ascii=False))
+print(json.dumps({'ok':True,'checks':['shop-lock','overlay-freeze','queue','chain-stable','bill-once','cantina-sprite']},ensure_ascii=False))
