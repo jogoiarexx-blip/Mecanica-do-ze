@@ -1,7 +1,7 @@
 name: Validate game
 on:
   push:
-    branches: [main]
+    branches: [main, v3.1-gameplay]
   workflow_dispatch:
 permissions:
   contents: read
@@ -43,20 +43,32 @@ jobs:
           repair=Path('js/repair-systems.js').read_text(encoding='utf-8')
           config=Path('js/game-config.js').read_text(encoding='utf-8')
           sw=Path('sw.js').read_text(encoding='utf-8')
-          assert 'SAVE_VERSION: 5' in config
-          assert 'devicePixelRatio' in js
-          assert 'moveMag=Math.hypot(dx,dy)' in js
-          assert 'sameTab && isOpen' in js
-          assert 'panel.classList.remove("open")' in js
-          assert 'difficulty: currentDifficulty' in js
-          assert 'brokeDay: _brokeDay' in js
-          assert 'function getProblemPart(problem)' in js
-          assert 'openFoodMenu()' in Path('js/mobile-controls.js').read_text(encoding='utf-8')
+          assert 'SAVE_VERSION: 6' in config
+          assert 'const waitingCars=[]' in js and 'MAX_WAITING_CARS=4' in js
+          assert 'function resolveChainProblems' in js
+          assert 'OverlayManager' in js and 'isGameplayBlocked()' in js
+          assert 'function isPartsShopUnlocked' in js
+          assert 'latePenaltyApplied' in js and 'hasDueBills' in js
+          assert '_playerRepairSpeedMult=1.25' in js
+          assert 'devicePixelRatio' in js and 'moveMag=Math.hypot(dx,dy)' in js
           assert 'function drawRepairVehicleVisuals' in repair
-          assert 'DESMONTANDO' in repair and 'INSTALANDO' in repair and 'AJUSTE FINAL' in repair
-          assert 'mecanica-ze-v13' in sw
-          assert './js/game-config.js' in sw and './js/repair-systems.js' in sw
-          assert "localStorage.setItem('mecanicaze_ach_v3'" not in js
-          assert '}, 16);' not in js
-          print('OK: syntax, structure and v3 regression guards')
+          assert 'mecanica-ze-v14' in sw
+          assert 'SKIP_WAITING' in sw
+          assert not Path('ico1000.png').exists()
+          print('OK: v3.1 regression guards')
           PY
+  browser-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Playwright
+        run: |
+          python -m pip install --disable-pip-version-check playwright==1.55.0
+          python -m playwright install --with-deps chromium
+      - name: Run browser smoke test
+        run: |
+          python -m http.server 8765 >/tmp/mecanica-http.log 2>&1 &
+          python tests/browser_smoke.py
