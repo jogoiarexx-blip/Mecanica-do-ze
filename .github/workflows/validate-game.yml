@@ -46,13 +46,15 @@ jobs:
           assert 'SAVE_VERSION: 5' in config
           assert 'devicePixelRatio' in js
           assert 'moveMag=Math.hypot(dx,dy)' in js
+          assert 'sameTab && isOpen' in js
+          assert 'panel.classList.remove("open")' in js
           assert 'difficulty: currentDifficulty' in js
           assert 'brokeDay: _brokeDay' in js
           assert 'function getProblemPart(problem)' in js
           assert 'openFoodMenu()' in Path('js/mobile-controls.js').read_text(encoding='utf-8')
           assert 'function drawRepairVehicleVisuals' in repair
           assert 'DESMONTANDO' in repair and 'INSTALANDO' in repair and 'AJUSTE FINAL' in repair
-          assert 'mecanica-ze-v12' in sw
+          assert 'mecanica-ze-v13' in sw
           assert './js/game-config.js' in sw and './js/repair-systems.js' in sw
           assert "localStorage.setItem('mecanicaze_ach_v3'" not in js
           assert '}, 16);' not in js
