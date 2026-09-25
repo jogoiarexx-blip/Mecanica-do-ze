@@ -1,4 +1,4 @@
-# Mecânica do Zé v3.0.1 — Correções PC + Celular
+# Mecânica do Zé v3.1.0 — Correções PC + Celular
 
 Esta versão parte da v2.2 original e mantém o conteúdo do jogo, mas reorganiza o projeto em CSS/JS separados.
 
@@ -137,3 +137,21 @@ Estrutura:
 - clicar em outra aba troca normalmente o conteúdo e mantém o painel aberto;
 - adicionados estados aria-expanded nos botões;
 - PWA atualizado para cache v13.
+
+
+## v3.1.0 — gameplay, fila e overlays
+- Loja de Peças exige o upgrade shop1; balcão mostra estado bloqueado antes da compra.
+- Scanner Pro resolve falhas em cadeia uma única vez no diagnóstico; pagamento usa exatamente o mesmo resultado.
+- Conquista Cascata agora exige 2 falhas, valor realmente possível no conteúdo atual.
+- Loja, Cantina e Relatório do Dia bloqueiam simulação e input enquanto abertos.
+- Fila de espera real com até 4 clientes, paciência própria, transferência automática e persistência no Save v6.
+- Voucher retorna pela baia ou fila e não some quando a oficina está cheia/fechada.
+- Contas penalizam reputação apenas uma vez por ciclo; recuperação da falência exige caixa positivo e nenhuma conta vencida.
+- Chave de Impacto passa a acelerar o progresso real; Macaco Hidráulico reduz stamina do conserto.
+- Estoque específico usa também 1 consumível genérico por serviço, mantendo utilidade do estoque geral.
+- Rádio respeita o volume salvo já ao iniciar.
+- Saves antigos limpam missões/conquistas antes de restaurar; autosave reforçado em visibilitychange e a cada 20 s.
+- Painéis laterais são exclusivos; balcão exibe os 8 tipos de peças.
+- PWA mostra aviso de nova versão e cache atualizado para v14.
+- ico1000.png removido por não ser utilizado.
+- CI ganhou smoke test real com Playwright.
