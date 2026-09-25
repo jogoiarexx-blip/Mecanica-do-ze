@@ -120,7 +120,7 @@ class GameStateManager {
  case S.MENU:
  if (menuEl) menuEl.style.display = 'flex';
  if (pauseEl) pauseEl.style.display = 'none';
- { const upg = document.getElementById('upgrade-panel'); if (upg) upg.classList.remove('open'); }
+ if(typeof closeSidePanels==='function')closeSidePanels();
  if (typeof SFX !== 'undefined') SFX.stopAmbient();
  break;
  case S.PLAYING:
@@ -131,7 +131,7 @@ class GameStateManager {
  case S.PAUSE:
  if (pauseEl) pauseEl.style.display = 'flex';
  if (menuEl) menuEl.style.display = 'none';
- { const upg = document.getElementById('upgrade-panel'); if (upg) upg.classList.remove('open'); }
+ if(typeof closeSidePanels==='function')closeSidePanels();
  if (typeof SFX !== 'undefined') SFX.stopAmbient();
  if (typeof updatePauseRadioSection === 'function') updatePauseRadioSection();
  break;
@@ -495,7 +495,7 @@ const SFX = (() => {
  };
 })();
 EventBus.on('car:arrive', () => SFX.carArrive());
-EventBus.on('car:fixed', () => { SFX.fixComplete(); setTimeout(() => SFX.cashRegister(), 350); });
+EventBus.on('car:fixed', () => { SFX.fixComplete(); gameTimeout(() => SFX.cashRegister(), 350); });
 EventBus.on('car:left', () => SFX.carLeave());
 EventBus.on('player:restock', () => SFX.restock());
 EventBus.on('player:diagnose', () => SFX.diagnose());
@@ -740,7 +740,7 @@ function calcRepGain(p, v) { return FameSystem.calcRepGain(p, v); }
 function calcRepLoss() { return FameSystem.calcRepLoss(); }
 function checkTierUp() { FameSystem.checkTierUp(); }
 const SaveSystem = (() => {
- const VERSION = window.MZ_CONFIG?.SAVE_VERSION || 5;
+ const VERSION = window.MZ_CONFIG?.SAVE_VERSION || 6;
  function key(slot) { return `mecanicaze_save_${slot}`; }
  function buildData() {
  return {
@@ -765,8 +765,9 @@ const SaveSystem = (() => {
    bayIndex: bays.indexOf(c.bay), vtypeId: c.vtype?.id || 'car', personalityId: c.personality?.id || 'normal',
    problemName: c.problem?.name || '', diagnosed: !!c.diagnosed, workProgress: c.workProgress || 0,
    patienceTimer: c.patienceTimer || 0, maxPatience: c.maxPatience || 2400, needsParts: c.needsParts || c.problem?.parts || 1,
-   color: c.color, isVIP: !!c.isVIP, arrivedTick: c.arrivedTick ?? tick, wasVoucher: !!c._wasVoucher
+   color: c.color, isVIP: !!c.isVIP, arrivedTick: c.arrivedTick ?? tick, wasVoucher: !!c._wasVoucher, chainProblems:[...(c.chainProblems||[])], chainResolved:!!c._chainResolved
  })),
+ waitingCars: waitingCars.map(c=>({vtypeId:c.vtype?.id||'car',personalityId:c.personality?.id||'normal',problemName:c.problem?.name||'',patienceTimer:c.patienceTimer||0,maxPatience:c.maxPatience||2400,needsParts:c.needsParts||c.problem?.parts||1,color:c.color,isVIP:!!c.isVIP,arrivedTick:c.arrivedTick??tick,wasVoucher:!!c._wasVoucher,chainProblems:[...(c.chainProblems||[])],chainResolved:!!c._chainResolved})),
  bills: typeof BillsSystem !== 'undefined' ? BillsSystem.getSaveData() : null,
  player: { x: player.x, y: player.y },
  };
@@ -805,6 +806,8 @@ const SaveSystem = (() => {
  });
  parts = Math.max(0, Math.min(savedParts, maxParts));
  stamina = Math.max(0, Math.min(savedStamina, maxStamina));
+ missions.forEach(m=>{m.done=false;m.progress=0;});
+ ACHIEVEMENTS.forEach(a=>a.done=false);
  if (d.missions)
  d.missions.forEach(md => {
  const m = missions.find(x => x.type === md.type);
@@ -822,12 +825,20 @@ const SaveSystem = (() => {
    const personality = CLIENT_PERSONALITIES.find(p => p.id === sc.personalityId) || CLIENT_PERSONALITIES[0];
    const problem = problems.find(p => p.name === sc.problemName); if (!problem) return;
    const car = { x:bay.x, y:bay.y, w:vtype.sizeW||bay.w, h:vtype.sizeH||bay.h, color:sc.color||'#888',
-     problem:{...problem}, chainProblems:[], diagnosed:!!sc.diagnosed, fixed:false, workProgress:sc.workProgress||0,
+     problem:{...problem}, chainProblems:Array.isArray(sc.chainProblems)?[...sc.chainProblems]:[], _chainResolved:!!sc.chainResolved, diagnosed:!!sc.diagnosed, fixed:false, workProgress:sc.workProgress||0,
      maxWork:problem.time/toolQuality, patienceTimer:sc.patienceTimer||0, maxPatience:sc.maxPatience||2400,
      patience:1-(sc.patienceTimer||0)/(sc.maxPatience||2400), bay, id:Math.random(), needsParts:sc.needsParts||problem.parts,
      isVIP:!!sc.isVIP, vtype, personality, arrivedTick:sc.arrivedTick??tick, _wasVoucher:!!sc.wasVoucher };
+   if(car.diagnosed&&diagnosticLevel>=3&&!car._chainResolved)resolveChainProblems(car);
    bay.car=car; cars.push(car);
  });
+ waitingCars.length=0;
+ if(Array.isArray(d.waitingCars))d.waitingCars.slice(0,MAX_WAITING_CARS).forEach(sc=>{
+  const vtype=VEHICLE_TYPES.find(v=>v.id===sc.vtypeId)||VEHICLE_TYPES[0];const personality=CLIENT_PERSONALITIES.find(p=>p.id===sc.personalityId)||CLIENT_PERSONALITIES[0];const problem=problems.find(p=>p.name===sc.problemName);if(!problem)return;
+  waitingCars.push({x:0,y:0,w:vtype.sizeW,h:vtype.sizeH,color:sc.color||'#888',problem:{...problem},chainProblems:Array.isArray(sc.chainProblems)?[...sc.chainProblems]:[],_chainResolved:!!sc.chainResolved,diagnosed:false,fixed:false,workProgress:0,maxWork:problem.time/toolQuality,patienceTimer:sc.patienceTimer||0,maxPatience:sc.maxPatience||2400,patience:1-(sc.patienceTimer||0)/(sc.maxPatience||2400),bay:null,id:Math.random(),needsParts:sc.needsParts||problem.parts,isVIP:!!sc.isVIP,vtype,personality,arrivedTick:sc.arrivedTick??tick,_wasVoucher:!!sc.wasVoucher,_queueTimer:0});
+ });
+ updateWaitingPositions();
+
  helpers.length = 0;
  if (d.helpers > 0) for (let i = 0; i < d.helpers; i++) spawnHelper();
  if (d.player) { player.x = d.player.x; player.y = d.player.y; }
@@ -875,6 +886,7 @@ const SaveSystem = (() => {
    data.brokeDay = data.brokeDay ?? -1; data.brokeWarned = data.brokeWarned ?? false;
    data.hungryWorkDayIndex = data.hungryWorkDayIndex ?? Math.floor((data.tick ?? 0)/(24*60*4));
  }
+ if(v<6){data.waitingCars=Array.isArray(data.waitingCars)?data.waitingCars:[];}
  data.v = VERSION;
  return data;
  }
@@ -911,7 +923,7 @@ const SaveSystem = (() => {
  }, 60000);
  return { saveToSlot, loadFromSlot, deleteSlot, getSlotInfo, showIndicator };
 })();
-const SAVE_VERSION = window.MZ_CONFIG?.SAVE_VERSION || 5;
+const SAVE_VERSION = window.MZ_CONFIG?.SAVE_VERSION || 6;
 function saveToSlot(slot, silent=false) { SaveSystem.saveToSlot(slot, silent); }
 function loadFromSlot(slot) { return SaveSystem.loadFromSlot(slot); }
 function deleteSlot(slot) { SaveSystem.deleteSlot(slot); }
@@ -1715,7 +1727,7 @@ function buildDayReport(){
  const newBayCount = Math.min(5 + (day - 5), bays.length);
  const prevBayCount = Math.min(5 + (day - 6), bays.length);
  if(newBayCount > prevBayCount){
- setTimeout(()=>showToast(`🚗 Baia ${newBayCount} desbloqueada! (+1 cliente/dia)`), 1500);
+ gameTimeout(()=>showToast(`🚗 Baia ${newBayCount} desbloqueada! (+1 cliente/dia)`),1500);
  }
  }
  const earned=totalMoneyEarned-dayStartRevenue;
@@ -2088,6 +2100,7 @@ function switchUpgradeTab(tab) {
      btn.setAttribute("aria-expanded",active?"true":"false");
    }
  });
+ closeSidePanels('upgrades');
  panel.classList.add("open");
  renderUpgradePanel();
  SFX.uiClick();
@@ -2195,48 +2208,66 @@ function resolveChainProblems(car){
  maxChainFound=Math.max(maxChainFound,car.chainProblems.length);
  return car.chainProblems;
 }
-function spawnCar(){
- const activeBayCount = getActiveBayCount();
- const freeBay=bays.slice(0, activeBayCount).find(b=>!b.car);if(!freeBay)return;
- const roll=Math.random();
- let acc=0,vtype=VEHICLE_TYPES[0];
+function buildCustomerCar(){
+ const roll=Math.random();let acc=0,vtype=VEHICLE_TYPES[0];
  for(const v of VEHICLE_TYPES){acc+=v.freq;if(roll<acc){vtype=v;break;}}
  let availProbs=[...problems];
- if(weatherState!=="rain"&&weatherState!=="storm") availProbs=availProbs.filter(p=>!p.weatherOnly);
- if(weatherState==="rain"||weatherState==="storm"){
- for(let i=0;i<2;i++)availProbs.push(problems.find(p=>p.name==="Aquaplanagem"));
- }
+ if(weatherState!=="rain"&&weatherState!=="storm")availProbs=availProbs.filter(p=>!p.weatherOnly);
+ if(weatherState==="rain"||weatherState==="storm")for(let i=0;i<2;i++)availProbs.push(problems.find(p=>p.name==="Aquaplanagem"));
  const prob={...availProbs[Math.floor(Math.random()*availProbs.length)]};
- const _vipMult=window._vipMult||1;const isVIP=vtype.id==="luxury"||Math.random()<getFameVipChance()*_vipMult;
+ const isVIP=vtype.id==="luxury"||Math.random()<getFameVipChance()*(window._vipMult||1);
  const personality=pickPersonality(isVIP||vtype.id==="luxury");
  const patienceBase=(isVIP?3200:2400)+Math.random()*1600;
- const _loyalMult=(personality.id==="loyal"&&window._loyalPatienceMult)?window._loyalPatienceMult:1;
- const car={
- x:freeBay.x,y:freeBay.y,
- w:vtype.sizeW||freeBay.w,
- h:vtype.sizeH||freeBay.h,
- color:isVIP?"#ffd700":carColors[Math.floor(Math.random()*carColors.length)],
- problem:{...prob},
- chainProblems:[], 
- diagnosed:false,fixed:false,
- workProgress:0,maxWork:prob.time/(toolQuality),
- patience:1,maxPatience:patienceBase*getFamePatienceBonus()*personality.patienceMult*getWeather().patienceMult*_loyalMult*(weatherState==="storm"&&window._stormPatienceBonus?window._stormPatienceBonus:1)*(window._diffPatienceMult||1),
- patienceTimer:0,bay:freeBay,
- id:Math.random(),
- needsParts:prob.parts,
- isVIP,
- vtype,
- personality,
- arrivedTick:tick,
- };
- freeBay.car=car;cars.push(car);
- EventBus.emit('car:arrive', { car });
- document.getElementById("carcount").textContent=cars.filter(c=>!c.fixed).length;
- updateHUD();
- if(isVIP){spawnFloatText(freeBay.x+freeBay.w/2,freeBay.y,"👑 VIP!","#ffd700");}
- if(vtype.id==="truck")spawnFloatText(freeBay.x+freeBay.w/2,freeBay.y-15,"🚚 CAMINHÃO!","#fb923c");
- if(personality.id!=="normal")spawnSpeech(car,personality.id);
- spawnParticles(freeBay.x+freeBay.w/2,freeBay.y+freeBay.h/2,isVIP?"#ffd700":"#e8820a",isVIP?12:6);
+ const loyal=(personality.id==="loyal"&&window._loyalPatienceMult)?window._loyalPatienceMult:1;
+ return {x:0,y:0,w:vtype.sizeW||150,h:vtype.sizeH||90,color:isVIP?"#ffd700":carColors[Math.floor(Math.random()*carColors.length)],
+  problem:{...prob},chainProblems:[],_chainResolved:false,diagnosed:false,fixed:false,workProgress:0,maxWork:prob.time/toolQuality,
+  patience:1,maxPatience:patienceBase*getFamePatienceBonus()*personality.patienceMult*getWeather().patienceMult*loyal*(weatherState==="storm"&&window._stormPatienceBonus?window._stormPatienceBonus:1)*(window._diffPatienceMult||1),
+  patienceTimer:0,bay:null,id:Math.random(),needsParts:prob.parts,isVIP,vtype,personality,arrivedTick:tick,_queueTimer:0};
+}
+function placeCarInBay(car,bay){
+ car.bay=bay;car.x=bay.x;car.y=bay.y;car.w=car.vtype?.sizeW||bay.w;car.h=car.vtype?.sizeH||bay.h;
+ bay.car=car;if(!cars.includes(car))cars.push(car);
+ EventBus.emit('car:arrive',{car});
+ if(car.isVIP)spawnFloatText(bay.x+bay.w/2,bay.y,"👑 VIP!","#ffd700");
+ if(car.vtype?.id==="truck")spawnFloatText(bay.x+bay.w/2,bay.y-15,"🚚 CAMINHÃO!","#fb923c");
+ if(car.personality?.id!=="normal")spawnSpeech(car,car.personality.id);
+ spawnParticles(bay.x+bay.w/2,bay.y+bay.h/2,car.isVIP?"#ffd700":"#e8820a",car.isVIP?12:6);
+}
+function updateWaitingPositions(){
+ waitingCars.forEach((car,i)=>{car._queueIndex=i;car.x=waitArea.x+80+i*280;car.y=waitArea.y+12;});
+}
+function enqueueWaitingCar(car,isVoucher=false){
+ if(waitingCars.length>=MAX_WAITING_CARS)return false;
+ car.bay=null;car._wasVoucher=!!(isVoucher||car._wasVoucher);car._queueTimer=0;waitingCars.push(car);updateWaitingPositions();
+ showToast(car._wasVoucher?'🎁 Cliente com voucher entrou na fila!':'🚗 Cliente aguardando na fila.');
+ return true;
+}
+function scheduleVoucherReturn(car){
+ const freeBay=isOpen()?bays.slice(0,getActiveBayCount()).find(b=>!b.car):null;
+ if(freeBay){placeCarInBay(car,freeBay);spawnFloatText(freeBay.x+freeBay.w/2,freeBay.y,"🎁 Voltou c/ voucher!","#34d399");showToast("🎁 Cliente voltou com voucher! (+50% paciência)");updateHUD();return;}
+ if(enqueueWaitingCar(car,true)){updateHUD();return;}
+ gameTimeout(()=>scheduleVoucherReturn(car),15000);
+}
+function processWaitingQueue(){
+ if(!isOpen()||!waitingCars.length)return;
+ let freeBay=bays.slice(0,getActiveBayCount()).find(b=>!b.car);
+ while(freeBay&&waitingCars.length){
+  const car=waitingCars.shift();updateWaitingPositions();placeCarInBay(car,freeBay);freeBay=bays.slice(0,getActiveBayCount()).find(b=>!b.car);
+ }
+}
+function updateWaitingQueue(){
+ if(!isOpen())return;
+ for(let i=waitingCars.length-1;i>=0;i--){
+  const car=waitingCars[i];car._queueTimer++;car.patienceTimer+=0.35;car.patience=Math.max(0,1-car.patienceTimer/car.maxPatience);
+  if(car.patience<=0){waitingCars.splice(i,1);const loss=Math.max(1,Math.floor(calcRepLoss()/2));reputation=Math.max(0,reputation-loss);_dayHadClientLeave=true;EventBus.emit('car:left',{car,repLoss:loss,fromQueue:true});showToast(`🚗 Cliente desistiu da fila! -${loss}⭐`);}
+ }
+ updateWaitingPositions();processWaitingQueue();
+}
+function spawnCar(){
+ const car=buildCustomerCar();
+ const freeBay=bays.slice(0,getActiveBayCount()).find(b=>!b.car);
+ if(freeBay)placeCarInBay(car,freeBay);else if(!enqueueWaitingCar(car,false))return;
+ document.getElementById("carcount").textContent=cars.filter(c=>!c.fixed).length+waitingCars.length;updateHUD();
 }
 function nearBay(){
  for(const b of bays){
@@ -2501,7 +2532,7 @@ function updateDayNight(){
  else dn.style.background="rgba(0,0,20,0.55)";
  const nowOpen=isOpen();
  if(nowOpen!==_wasOpen){
- if(nowOpen)SFX.shopOpen(); else{SFX.shopClose();buildDayReport();if(typeof BillsSystem!=="undefined")BillsSystem.tick_update();setTimeout(showProgressionTips,2000);}
+ if(nowOpen)SFX.shopOpen(); else{SFX.shopClose();buildDayReport();if(typeof BillsSystem!=="undefined")BillsSystem.tick_update();gameTimeout(showProgressionTips,2000);}
  _wasOpen=nowOpen;
  }
 }
@@ -2714,24 +2745,13 @@ function drawPartsShelf(){
 }
 function drawPartsShopCounter(){
  const px=tx(partsShopArea.x),py=ty(partsShopArea.y),pw=partsShopArea.w,ph=partsShopArea.h;
- const isNear=nearShop();
- const cg=ctx.createLinearGradient(px,py,px,py+ph);cg.addColorStop(0,"#1a2a1a");cg.addColorStop(1,"#0a1a0a");
- ctx.fillStyle=cg;ctx.fillRect(px,py,pw,ph);
- ctx.strokeStyle=isNear?"#22c55e":"#2a4a2a";ctx.lineWidth=isNear?2:1;ctx.strokeRect(px,py,pw,ph);
- ctx.fillStyle="#2a4a2a";ctx.fillRect(px,py,pw,14);
- const dispParts=PART_TYPES.slice(0,5);
- dispParts.forEach((p,i)=>{
- const bx=px+6+i*(pw/5.2);const by=py+16;
- const have=partInventory[p.id]||0;
- ctx.fillStyle=have>0?"#1a3a1a":"#1a1a1a";ctx.fillRect(bx,by,pw/5.5,ph-24);
- ctx.strokeStyle=have>0?"#22c55e":"#333";ctx.lineWidth=1;ctx.strokeRect(bx,by,pw/5.5,ph-24);
- ctx.font="12px sans-serif";ctx.textAlign="center";ctx.fillText(p.emoji,bx+pw/11,by+14);
- ctx.fillStyle=have>0?"#22c55e":"#555";ctx.font="bold 10px 'VT323'";ctx.fillText(have,bx+pw/11,by+26);
- });
- const pulse=isNear?0.7+0.3*Math.sin(tick*0.12):0.5;
- ctx.fillStyle=`rgba(34,197,94,${pulse})`;ctx.font="bold 14px 'VT323'";ctx.textAlign="center";
- ctx.fillText("🏪 LOJA DE PEÇAS",px+pw/2,py+ph+14);
- if(isNear){ctx.fillStyle="rgba(34,197,94,0.9)";ctx.font="11px 'VT323'";ctx.fillText("[E] Abrir Loja",px+pw/2,py+ph+26);}
+ const isNear=nearShop(),unlocked=isPartsShopUnlocked();
+ const cg=ctx.createLinearGradient(px,py,px,py+ph);cg.addColorStop(0,unlocked?"#1a2a1a":"#241515");cg.addColorStop(1,unlocked?"#0a1a0a":"#120909");ctx.fillStyle=cg;ctx.fillRect(px,py,pw,ph);
+ ctx.strokeStyle=isNear?(unlocked?"#22c55e":"#ef4444"):(unlocked?"#2a4a2a":"#4a2222");ctx.lineWidth=isNear?2:1;ctx.strokeRect(px,py,pw,ph);
+ const cols=4,rows=2,cellW=(pw-12)/cols,cellH=(ph-24)/rows;
+ PART_TYPES.forEach((p,i)=>{const col=i%cols,row=Math.floor(i/cols),bx=px+6+col*cellW,by=py+10+row*cellH,have=partInventory[p.id]||0;ctx.fillStyle=unlocked?(have>0?"#1a3a1a":"#1a1a1a"):"#1a1111";ctx.fillRect(bx,by,cellW-3,cellH-3);ctx.font="11px sans-serif";ctx.textAlign="center";ctx.fillText(unlocked?p.emoji:"🔒",bx+cellW/2,by+13);ctx.fillStyle=unlocked?(have>0?"#22c55e":"#666"):"#a33";ctx.font="bold 9px 'VT323'";ctx.fillText(unlocked?have:"LOCK",bx+cellW/2,by+24);});
+ ctx.fillStyle=unlocked?"#22c55e":"#ef4444";ctx.font="bold 14px 'VT323'";ctx.textAlign="center";ctx.fillText(unlocked?"🏪 LOJA DE PEÇAS":"🔒 LOJA DE PEÇAS",px+pw/2,py+ph+14);
+ if(isNear){ctx.font="11px 'VT323'";ctx.fillText(unlocked?"[E] Abrir Loja":"Compre o upgrade na aba OFICINA",px+pw/2,py+ph+26);}
 }
 function drawCantineArea(){
  const cx=tx(cantineArea.x),cy=ty(cantineArea.y),cw=cantineArea.w,ch=cantineArea.h;
@@ -2845,7 +2865,8 @@ function drawWaitArea(){
  ctx.strokeStyle="rgba(232,130,10,0.4)";ctx.lineWidth=2;ctx.setLineDash([10,6]);ctx.strokeRect(wx2,wy2,ww,wh);ctx.setLineDash([]);
  const wg2=ctx.createLinearGradient(0,wy2,0,wy2+wh);wg2.addColorStop(0,"rgba(232,130,10,0.08)");wg2.addColorStop(1,"rgba(232,130,10,0.03)");
  ctx.fillStyle=wg2;ctx.fillRect(wx2,wy2,ww,wh);
- ctx.fillStyle="#e8820a";ctx.font="bold 13px 'VT323'";ctx.textAlign="center";ctx.fillText("🚗 FILA DE ESPERA 🚗",wx2+ww/2,wy2+wh/2+5);
+ ctx.fillStyle="#e8820a";ctx.font="bold 13px 'VT323'";ctx.textAlign="center";ctx.fillText(`🚗 FILA DE ESPERA (${waitingCars.length}/${MAX_WAITING_CARS}) 🚗`,wx2+ww/2,wy2+18);
+ waitingCars.forEach((car,i)=>{const x=wx2+90+i*280,y=wy2+43;ctx.fillStyle="rgba(0,0,0,.7)";ctx.fillRect(x-70,y-14,140,28);ctx.strokeStyle=car.isVIP?"#ffd700":"#e8820a";ctx.strokeRect(x-70,y-14,140,28);ctx.font="12px sans-serif";ctx.fillStyle="#fff";ctx.fillText(car.vtype?.emoji||"🚗",x-53,y+4);ctx.font="bold 11px 'VT323'";ctx.fillText(`${car.problem.emoji} ${Math.max(0,Math.round(car.patience*100))}%`,x+15,y+4);});
 }
 function drawBay(b){
  const bx2=tx(b.x),by2=ty(b.y),bw=b.w,bh=b.h;
@@ -3533,6 +3554,7 @@ function update(){
  }
  }
  helpers.forEach(h => updateHelperAI(h));
+ updateWaitingQueue();
  WeatherSystem.tickDrops();
  [...cars].forEach(car=>{
  if(car.fixed){
@@ -3555,21 +3577,9 @@ function update(){
  if(car.personality?.id==="complainer"){showToast(`😠 Reclamão foi embora! -${loss+2}⭐ ← review negativo!`);reputation=Math.max(0,reputation-2);}
  else showToast(`🚗 Cliente foi embora! -${loss}⭐`);
  updateHUD();
- if(window._voucherReturn && car.personality?.id !== "complainer" && isOpen()){
- const returnCar={...car,fixed:false,diagnosed:false,workProgress:0,patience:1,patienceTimer:0,maxPatience:car.maxPatience*1.5,_wasVoucher:true,id:Math.random()};
- gameTimeout(()=>{
- if(!isOpen())return;
- const freeBay=bays.slice(0,getActiveBayCount()).find(b=>!b.car);
- if(!freeBay)return;
- returnCar.x=freeBay.x;returnCar.y=freeBay.y;
- returnCar.w=freeBay.w;returnCar.h=freeBay.h;
- returnCar.bay=freeBay;freeBay.car=returnCar;
- cars.push(returnCar);
- EventBus.emit('car:arrive', { car:returnCar });
- spawnFloatText(freeBay.x+freeBay.w/2,freeBay.y,"🎁 Voltou c/ voucher!","#34d399");
- showToast("🎁 Cliente voltou com voucher! (+50% paciencia)");
- updateHUD();
- },45000);
+ if(window._voucherReturn && car.personality?.id !== "complainer"){
+ const returnCar={...car,fixed:false,diagnosed:false,workProgress:0,chainProblems:[],_chainResolved:false,patience:1,patienceTimer:0,maxPatience:car.maxPatience*1.5,_wasVoucher:true,id:Math.random(),bay:null};
+ gameTimeout(()=>scheduleVoucherReturn(returnCar),45000);
  }
  }
  });
@@ -3634,7 +3644,7 @@ function loop(now){
  const elapsed = Math.min(100, Math.max(0, now - _lastFrameTime));
  _lastFrameTime = now;
  if (currentGameState !== GAME_STATE.MENU) {
-   if (currentGameState === GAME_STATE.PLAYING) {
+   if (currentGameState === GAME_STATE.PLAYING && !isGameplayBlocked()) {
      _fixedAccumulator += elapsed;
      let safety = 0;
      while (_fixedAccumulator >= FIXED_STEP_MS && safety < 6) {
@@ -3655,7 +3665,7 @@ requestAnimationFrame(loop);
 document.addEventListener("keydown",e=>{
  if(document.getElementById("tutorial").style.display!=="none")return;
  if(currentGameState===GAME_STATE.MENU)return;
- if(currentGameState===GAME_STATE.PAUSE)return;
+ if(currentGameState===GAME_STATE.PAUSE||isGameplayBlocked())return;
  keys[e.key.toLowerCase()]=true;
  if(e.key===" "){e.preventDefault();doFix();}
  if(e.key.toLowerCase()==="f"){doFix();}
@@ -3678,7 +3688,8 @@ function clearInputState(){
  joyDX=0;joyDY=0;
 }
 window.addEventListener('blur',clearInputState);
-document.addEventListener('visibilitychange',()=>{if(document.hidden){clearInputState();if(currentGameState===GAME_STATE.PLAYING)pauseGame();}});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){clearInputState();if(currentSlot!==null&&currentGameState!==GAME_STATE.MENU)saveToSlot(currentSlot,true);if(currentGameState===GAME_STATE.PLAYING)pauseGame();}});
+setInterval(()=>{if(currentSlot!==null&&currentGameState!==GAME_STATE.MENU)saveToSlot(currentSlot,true);},20000);
 function toggleFS(){if(!document.fullscreenElement){document.documentElement.requestFullscreen().catch(()=>{});}else{document.exitFullscreen();}}
 document.getElementById("fs-btn").addEventListener("click",toggleFS);
 document.addEventListener("keydown",e=>{if(e.key==="F11"){e.preventDefault();toggleFS();}},true);
@@ -3726,7 +3737,7 @@ function resetGameState(){
  diagnosticLevel=1;toolQuality=1;reputationMult=1;
  gameMinute=8*60;tick=0;spawnDelay=1800;spawnTimer=0; weatherTimer=0;nextWeatherChange=1800;
  _lastTierIdx=0;_tierUpAnim=null; actionCooldown=0;fixingCar=null;fixTimer=0;playerAction=null;playerActionTimer=0;playerWorkTask=null;
- cars.length=0;particles.length=0;floatTexts.length=0;helpers.length=0;speechBubbles.length=0;
+ cars.length=0;waitingCars.length=0;particles.length=0;floatTexts.length=0;helpers.length=0;speechBubbles.length=0;OverlayManager.reset();
  bays.forEach(b=>b.car=null);
  player.x=400;player.y=600;player.dir="down";player.frame=0;
  camera.x=0;camera.y=0;
@@ -3760,7 +3771,7 @@ function startGame(){
 function returnToMenu(){
  clearGameTimeouts();clearInputState();
  if(currentSlot!==null)saveToSlot(currentSlot);
- closeFoodMenu();cars.length=0;particles.length=0;floatTexts.length=0;speechBubbles.length=0;
+ OverlayManager.closeAll();cars.length=0;waitingCars.length=0;particles.length=0;floatTexts.length=0;speechBubbles.length=0;
  bays.forEach(b=>b.car=null);
  setGameState(GAME_STATE.MENU);
 }
@@ -3772,6 +3783,9 @@ window.openSaveScreen=openSaveScreen;window.closeSaveScreen=closeSaveScreen;wind
 document.addEventListener("keydown",e=>{
  if(e.key==="Escape"){
  e.preventDefault();
+ if(partsShopVisible){closePartsShop();return;}
+ if(document.getElementById('cantine-menu-modal')?.style.display!=='none'){closeFoodMenu();return;}
+ if(dayReportVisible){closeDayReport();return;}
  const tut=document.getElementById("tutorial");const menu=document.getElementById("main-menu");const save=document.getElementById("save-screen");const pause=document.getElementById("pause-menu");
  if(tut.style.display!=="none"){closeTutorial();return;}
  if(save.style.display!=="none"){closeSaveScreen();return;}
@@ -3781,7 +3795,7 @@ document.addEventListener("keydown",e=>{
 },true);
 updateDayNight();updateHUD();renderUpgradePanel();checkMissions();
 canvas.addEventListener("click",e=>{
- if(currentGameState!==GAME_STATE.PLAYING)return;
+ if(currentGameState!==GAME_STATE.PLAYING||isGameplayBlocked())return;
  if(hasCantine)return;
  const rect=canvas.getBoundingClientRect();
  const mx=(e.clientX-rect.left)*(viewW/Math.max(1,rect.width));const my=(e.clientY-rect.top)*(viewH/Math.max(1,rect.height));
@@ -3801,6 +3815,7 @@ const PROGRESSION_TIPS = [
 ];
 let _shownTips = new Set();
 function showProgressionTips() {
+ if(currentGameState!==GAME_STATE.PLAYING||isGameplayBlocked())return;
  const day = Math.floor(tick / (24 * 60 * 4)) + 1;
  PROGRESSION_TIPS.forEach(t => {
  if(t.day !== day - 1) return;
@@ -3822,7 +3837,7 @@ function showProgressionToast(html) {
  setTimeout(() => el.classList.add('prog-tip-show'), 50);
  setTimeout(() => { el.classList.remove('prog-tip-show'); setTimeout(() => el.remove(), 500); }, 6000);
 }
-EventBus.on('game:resume', () => { setTimeout(showProgressionTips, 1500); });
+EventBus.on('game:resume', () => { gameTimeout(showProgressionTips,1500); });
 let _brokeDay = -1; 
 let _brokeWarned = false;
 function checkBankruptcy() {
@@ -3857,12 +3872,12 @@ function checkBankruptcy() {
  overlay.innerHTML = '🚨 OFICINA EM CRISE!<br><small>Quite as dívidas para operar normalmente</small>';
  overlay.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(220,38,38,0.95);color:white;font-family:"Press Start 2P",monospace;font-size:10px;padding:20px 30px;border-radius:12px;z-index:500;text-align:center;line-height:2;border:2px solid #f87171;box-shadow:0 0 40px rgba(220,38,38,0.6);animation:bills-pulse 1s infinite alternate;pointer-events:none;';
  document.body.appendChild(overlay);
- setTimeout(() => { const o = document.getElementById('broke-overlay'); if(o) o.remove(); }, 5000);
+ gameTimeout(() => { const o = document.getElementById('broke-overlay'); if(o) o.remove(); },5000);
  }
  }
 }
 function checkBankruptcyRecovery() {
- if(money > 0 && _brokeDay !== -1) {
+ if(money > 0 && _brokeDay !== -1 && !(typeof BillsSystem!=='undefined'&&BillsSystem.hasDueBills&&BillsSystem.hasDueBills())) {
  _brokeDay = -1;
  _brokeWarned = false;
  const panel = document.getElementById('upgrade-panel');
@@ -3880,6 +3895,7 @@ const BillsSystem = (() => {
  let billsPaid = false; 
  let billsDue = false; 
  let panelOpen = false;
+ let latePenaltyApplied = false;
  function currentDay() {
  if (typeof tick === 'undefined') return 1;
  return Math.floor(tick / (24 * 60 * 4)) + 1;
@@ -3905,7 +3921,7 @@ const BillsSystem = (() => {
  lastWarnDay = day;
  const total = getTotal();
  if (typeof showToast !== 'undefined') {
- setTimeout(() => showToast(`⏰ Contas vencem em 2 dias! Prepare $${total} 💸`), 1000);
+ gameTimeout(() => showToast(`⏰ Contas vencem em 2 dias! Prepare $${total} 💸`),1000);
  }
  updateToggleAlert(true); 
  }
@@ -3916,7 +3932,7 @@ const BillsSystem = (() => {
  updateToggleAlert(true);
  renderBillsPanel();
  if (typeof showToast !== 'undefined') {
- setTimeout(() => showToast('💸 Contas chegaram! Pague pelo botão CONTAS.'), 800);
+ gameTimeout(() => showToast('💸 Contas chegaram! Pague pelo botão CONTAS.'),800);
  }
  }
  if (billsPaid) updateToggleAlert(false);
@@ -3928,16 +3944,14 @@ const BillsSystem = (() => {
  if (typeof money === 'undefined') return;
  if (money < total) {
  const diff = total - money;
- if (typeof showToast !== 'undefined')
- showToast(`⚠️ Sem grana! Faltam $${diff}. Reputação penalizada!`);
- if (typeof reputation !== 'undefined') reputation = Math.max(0, reputation - 30);
- if (typeof money !== 'undefined') money = Math.max(0, money - money); 
+ if(!latePenaltyApplied){reputation=Math.max(0,reputation-30);latePenaltyApplied=true;showToast(`⚠️ Sem grana! Faltam $${diff}. -30⭐ pelo atraso.`);}else showToast(`⚠️ Ainda faltam $${diff}. A penalidade deste ciclo já foi aplicada.`);
  if (typeof updateHUD !== 'undefined') updateHUD();
  return;
  }
  money -= total;
  billsPaid = true;
  billsDue = false;
+ latePenaltyApplied=false;
  updateToggleAlert(false);
  renderBillsPanel();
  if (typeof updateHUD !== 'undefined') updateHUD();
@@ -3999,23 +4013,26 @@ const BillsSystem = (() => {
  if (panelOpen) renderBillsPanel();
  if (typeof SFX !== 'undefined') SFX.uiClick();
  }
+ function closePanel(){panelOpen=false;const panel=document.getElementById('bills-panel');if(panel)panel.classList.remove('open');}
+ function hasDueBills(){return billsDue&&!billsPaid;}
  function reset() {
- lastBillDay=0;billsPaid=false;billsDue=false;panelOpen=false;lastWarnDay=-1;
+ lastBillDay=0;billsPaid=false;billsDue=false;panelOpen=false;lastWarnDay=-1;latePenaltyApplied=false;
  updateToggleAlert(false);renderBillsPanel();
  }
  function getSaveData() {
- return { lastBillDay, billsPaid, billsDue };
+ return { lastBillDay, billsPaid, billsDue, latePenaltyApplied };
  }
  function applySaveData(d) {
  if (!d) return;
  lastBillDay = d.lastBillDay || 0;
  billsPaid = d.billsPaid || false;
  billsDue = d.billsDue || false;
+ latePenaltyApplied=!!d.latePenaltyApplied;
  updateToggleAlert(billsDue && !billsPaid);
  }
- return { tick_update, payAll, togglePanel, renderBillsPanel, getSaveData, applySaveData, reset };
+ return { tick_update, payAll, togglePanel, closePanel, hasDueBills, renderBillsPanel, getSaveData, applySaveData, reset };
 })();
-function toggleBillsPanel() { BillsSystem.togglePanel(); }
+function toggleBillsPanel() { const p=document.getElementById('bills-panel');if(p&&!p.classList.contains('open'))closeSidePanels('bills');BillsSystem.togglePanel(); }
 function payAllBills() { BillsSystem.payAll(); }
 window.toggleBillsPanel = toggleBillsPanel;
 window.payAllBills = payAllBills;
