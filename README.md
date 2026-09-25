@@ -127,3 +127,5 @@ Estrutura:
 - créditos migrados de setInterval para requestAnimationFrame;
 - modularização inicial: game-config.js e repair-systems.js separados do game.js;
 - PWA atualizado para cache v12.
+
+- CI de regressão ampliado para Save v5, módulos, DPR, mobile e PWA.
