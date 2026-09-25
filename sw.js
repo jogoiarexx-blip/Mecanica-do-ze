@@ -6,7 +6,7 @@ const PRECACHE=[
  './js/game-config.js',
  './js/repair-systems.js','./js/mobile-controls.js','./js/pwa.js',
  './icon-192.png','./icon-512.png',
- './assets/sprites/ze.png','./assets/sprites/ajudante.png','./assets/sprites/actions.png','./assets/sprites/cantina-data.js'
+ './assets/sprites/ze.png','./assets/sprites/ajudante.png','./assets/sprites/actions.png','./assets/sprites/cantina.webp'
 ];
 self.addEventListener('install',event=>{
  event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.addAll(PRECACHE)));
