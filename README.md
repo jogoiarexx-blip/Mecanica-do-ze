@@ -1,4 +1,4 @@
-# Mecânica do Zé v2.8.0 — Correções PC + Celular
+# Mecânica do Zé v2.9.0 — Correções PC + Celular
 
 Esta versão parte da v2.2 original e mantém o conteúdo do jogo, mas reorganiza o projeto em CSS/JS separados.
 
@@ -97,3 +97,15 @@ Estrutura:
 - estados especiais foram aplicados para motor, óleo, bateria, elétrica, correia, radiador, superaquecimento, pneu, freio, aquaplanagem, transmissão e farol;
 - o rótulo de serviço agora mostra DESMONTANDO, INSTALANDO e AJUSTE FINAL;
 - cache PWA atualizado para v10.
+
+
+## v2.9.0 — som e efeitos por defeito
+- cada grupo de defeito ganhou assinatura sonora própria usando WebAudio, sem arquivos de áudio externos;
+- Motor/Transmissão/Correia usam impacto metálico e catraca;
+- Pneu/Freio/Aquaplanagem usam impacto baixo e ruído de roda;
+- Elétrica/Bateria/Farol usam pulsos e estalos elétricos;
+- Óleo/Radiador/Superaquecimento usam ruído de fluido/vapor e tons graves;
+- o som muda levemente entre DESMONTANDO, INSTALANDO e AJUSTE FINAL;
+- partículas também mudam de cor e intensidade conforme defeito e etapa;
+- Zé e ajudante compartilham o mesmo sistema de feedback;
+- cache PWA atualizado para v11.
