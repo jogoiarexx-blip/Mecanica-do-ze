@@ -217,6 +217,33 @@ const SFX = (() => {
  _osc('triangle', 120, t, 0.08, 0.5 * _volume, 0.001);
  });
  }
+ function repair(problemName, stage=1) {
+ _play(t => {
+ const st=Math.max(1,Math.min(3,stage|0));
+ const phaseMul=[0,0.88,1.0,1.14][st];
+ if(['Motor','Transmissão','Correia'].includes(problemName)){
+   _noise(0.10,0.22*_volume,1800+st*300);
+   _osc('triangle',110*phaseMul,t,0.09,0.38*_volume,0.001);
+   _osc('sine',760*phaseMul,t+0.03,0.12,0.24*_volume,0.001);
+   _osc('sine',1140*phaseMul,t+0.08,0.09,0.16*_volume,0.001);
+ } else if(['Pneu','Freio','Aquaplanagem'].includes(problemName)){
+   _osc('triangle',75*phaseMul,t,0.08,0.48*_volume,0.001);
+   _noise(0.08,0.26*_volume,700+st*220);
+   _osc('square',210*phaseMul,t+0.06,0.06,0.16*_volume,0.001);
+ } else if(['Elétrica','Bateria','Farol'].includes(problemName)){
+   _osc('square',420*phaseMul,t,0.07,0.18*_volume,0.001);
+   _osc('square',840*phaseMul,t+0.04,0.06,0.12*_volume,0.001);
+   _noise(0.045,0.10*_volume,3600+st*400);
+ } else if(['Óleo','Radiador','Superaquecimento'].includes(problemName)){
+   _noise(0.13,0.20*_volume,420+st*120);
+   _osc('sine',95*phaseMul,t,0.13,0.25*_volume,0.001);
+   if(problemName!=='Óleo') _osc('triangle',260*phaseMul,t+0.05,0.08,0.12*_volume,0.001);
+ } else {
+   _noise(0.10,0.20*_volume,1800);
+   _osc('sine',800*phaseMul,t,0.14,0.25*_volume,0.001);
+ }
+ });
+ }
  function diagnose() {
  _play(t => {
  [440, 550, 660, 880].forEach((freq, i) => {
@@ -444,7 +471,7 @@ const SFX = (() => {
  if (_radioGain) _radioGain.gain.setTargetAtTime(v * 0.7, _ctx.currentTime, 0.05);
  }
  return {
- wrench, diagnose, fixComplete, cashRegister, carArrive, carLeave, restock,
+ wrench, repair, diagnose, fixComplete, cashRegister, carArrive, carLeave, restock,
  error, missionComplete, upgradeBuy, footstep, uiClick, staminaWarn,
  shopClose, shopOpen, startAmbient, stopAmbient, setVolume, setMuted, isMuted, _init,
  startRadio, stopRadio, isRadioOn, _setRadioVolume: setRadioVolume,
@@ -1222,10 +1249,11 @@ function updateHelperAI(h) {
  const fspot=getCarWorkSpot(car,'fix',h);h.x=fspot.x;h.y=fspot.y;h.dir=fspot.dir;
  h.frame = Math.floor(h.stateTimer / 6) % 4;
  if (h.stateTimer % 10 === 0) {
- SFX.wrench();
- var wx = car.x + car.w/2 + (Math.random()-0.5)*30;
- var wy = car.y + car.h*0.8;
- spawnParticles(wx, wy, '#fbbf24', 3);
+ const helperStage=getRepairStage(car);
+ if(h.stateTimer%20===0) SFX.repair(car.problem.name,helperStage);
+ const hfx=getRepairFx(car.problem.name,helperStage);
+ const hpos=getRepairEffectPoint(car,'fix',h);
+ spawnParticles(hpos.x,hpos.y,hfx.color,Math.max(2,Math.floor(hfx.count/2)));
  car.workProgress += 5 * toolQuality * (window._helperSpeedMult||1) * (h._speedBonus||1);
  if (car.workProgress >= car.maxWork) {
  h.speech = '✅ Consertado!';
@@ -1372,6 +1400,27 @@ const REPAIR_WORK_PROFILES={
  'Farol':{zone:'frontCorner',action:'diagnose'},
  'Radiador':{zone:'front',action:'toolbox'}
 };
+function getRepairStage(car){
+ const pct=Math.max(0,Math.min(1,(car?.workProgress||0)/(car?.maxWork||1)));
+ return pct<0.33?1:pct<0.66?2:3;
+}
+function getRepairFx(problemName,stage){
+ const st=Math.max(1,Math.min(3,stage||1));
+ if(['Elétrica','Bateria','Farol'].includes(problemName)) return {color:'#60a5fa',symbol:st===3?'⚡':'✦',count:st===3?5:8};
+ if(['Pneu','Freio','Aquaplanagem'].includes(problemName)) return {color:problemName==='Aquaplanagem'?'#38bdf8':'#ef4444',symbol:st===1?'◌':'✦',count:st===3?4:7};
+ if(['Óleo'].includes(problemName)) return {color:'#a16207',symbol:'●',count:st===3?3:6};
+ if(['Radiador','Superaquecimento'].includes(problemName)) return {color:problemName==='Superaquecimento'?'#f87171':'#93c5fd',symbol:'≈',count:st===3?3:6};
+ if(['Transmissão','Correia'].includes(problemName)) return {color:'#a78bfa',symbol:'⚙',count:st===3?4:7};
+ return {color:'#fbbf24',symbol:'✦',count:st===3?4:8};
+}
+function spawnRepairFx(car,actor=player){
+ const stage=getRepairStage(car);
+ const fx=getRepairFx(car.problem?.name,stage);
+ const pos=getRepairEffectPoint(car,'fix',actor);
+ spawnParticles(pos.x,pos.y,fx.color,fx.count);
+ spawnFloatText(pos.x,pos.y-8,`${fx.symbol} ${stage===1?'DESMONTANDO':stage===2?'INSTALANDO':'AJUSTANDO'}`,fx.color);
+ return stage;
+}
 function getRepairWorkProfile(car,mode='fix'){
  const base=REPAIR_WORK_PROFILES[car?.problem?.name]||{zone:'front',action:'fix'};
  return mode==='diagnose'?{...base,action:'diagnose'}:base;
@@ -2215,10 +2264,9 @@ function performFixAtCar(car,bay){
  stamina=Math.max(0,stamina-12*(window._fixStaminaMult||1));
  hunger=Math.max(0,hunger-3);
  actionCooldown=Math.floor(20*(window._cooldownMult||1));
- SFX.wrench();
- const fx=getRepairEffectPoint(car,'fix',player);
- spawnParticles(fx.x,fx.y,'#fbbf24',8);
- spawnFloatText(fx.x,fx.y-8,`${car.problem.emoji} ${car.problem.name}`,'#fbbf24');
+ const repairStage=getRepairStage(car);
+ SFX.repair(car.problem.name,repairStage);
+ spawnRepairFx(car,player);
  const _nightBonus=(window._nightSpeedBonus&&(Math.floor(gameMinute/60)%24>=20||Math.floor(gameMinute/60)%24<8))?window._nightSpeedBonus:1;
  car.workProgress+=20*_nightBonus;
  if(car.workProgress>=car.maxWork){completeFix(car,bay);}
