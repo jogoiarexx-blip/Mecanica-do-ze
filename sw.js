@@ -1,4 +1,4 @@
-const CACHE_NAME='mecanica-ze-v13';
+const CACHE_NAME='mecanica-ze-v14';
 const PRECACHE=[
  './','./index.html','./manifest.json',
  './css/game.css','./css/mobile.css',
@@ -10,7 +10,6 @@ const PRECACHE=[
 ];
 self.addEventListener('install',event=>{
  event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.addAll(PRECACHE)));
- self.skipWaiting();
 });
 self.addEventListener('activate',event=>{
  event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE_NAME).map(k=>caches.delete(k)))));
@@ -32,3 +31,4 @@ self.addEventListener('fetch',event=>{
    return cached||network;
  }));
 });
+self.addEventListener('message',event=>{if(event.data?.type==='SKIP_WAITING')self.skipWaiting();});
