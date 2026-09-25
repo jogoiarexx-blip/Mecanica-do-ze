@@ -53,8 +53,7 @@ Estrutura:
 - hitboxes e colisões continuam usando as dimensões originais para não alterar a jogabilidade;
 - render procedural antigo permanece como fallback caso o asset não carregue;
 - sprites adicionados ao precache do PWA (cache v6);
-- ícones de estado do ajudante reposicionados para não cobrir a cabeça do sprite;
-- integração validada em Chromium com movimento, troca de direção e render dos 8 testes de direção.
+- ícones de estado do ajudante reposicionados para não cobrir a cabeça do sprite.
 
 
 ## v2.5.0 — animações de trabalho
