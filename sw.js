@@ -1,4 +1,4 @@
-const CACHE_NAME='mecanica-ze-v7';
+const CACHE_NAME='mecanica-ze-v8';
 const PRECACHE=[
  './','./index.html','./manifest.json',
  './css/game.css','./css/mobile.css',
