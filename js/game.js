@@ -2284,7 +2284,7 @@ function performFixAtCar(car,bay){
 }
 function completeFix(car,bay){
  if(car.fixed)return;
- car.fixed=true;bay.car=null;
+ car.fixed=true;car.completionTimer=90;car.workProgress=car.maxWork;
  const prob=car.problem;
  const partNeeded=getProblemPart(prob);
  const actualNeeds=Math.max(1,car.needsParts-(window._partsDiscount||0));
@@ -2332,7 +2332,6 @@ function completeFix(car,bay){
  showToast(`${car.problem.emoji} ${car.problem.name} consertado! +$${earned} +${rep}⭐`);
  checkTierUp();checkAchievements();
  updateHUD();checkMissions();renderUpgradePanel();
- setTimeout(()=>{const i=cars.indexOf(car);if(i>-1)cars.splice(i,1);},100);
 }
 function doDiagnose(){
  if(playerWorkTask||actionCooldown>0)return;
@@ -2827,7 +2826,7 @@ function drawBay(b){
  ctx.fillStyle=labelColor;ctx.font="bold 11px 'VT323'";ctx.textAlign="center";ctx.fillText(b.label,bx2+bw/2,by2-8);
 }
 function drawCar(car){
- if(car.fixed)return;
+ if(car.fixed&&!(car.completionTimer>0))return;
  const bx=tx(car.x),by=ty(car.y),cw=car.w,ch=car.h;
  const isWorking=car.diagnosed&&car.workProgress>0&&car.workProgress<car.maxWork;
  const sa=isWorking?tick*0.05:0;
@@ -2900,7 +2899,7 @@ function drawCar(car){
  drawCarBadges(car,bx,by,cw,ch);
 }
 function drawMoto(car){
- if(car.fixed)return;
+ if(car.fixed&&!(car.completionTimer>0))return;
  const bx=tx(car.x),by=ty(car.y),cw=car.w,ch=car.h;
  const isWorking=car.diagnosed&&car.workProgress>0&&car.workProgress<car.maxWork;
  const sa=isWorking?tick*0.09:0;
@@ -2968,7 +2967,7 @@ function drawMoto(car){
  drawCarBadges(car,bx,by,cw,ch);
 }
 function drawTruck(car){
- if(car.fixed)return;
+ if(car.fixed&&!(car.completionTimer>0))return;
  const bx=tx(car.x),by=ty(car.y),cw=car.w,ch=car.h;
  const isWorking=car.diagnosed&&car.workProgress>0&&car.workProgress<car.maxWork;
  const sa=isWorking?tick*0.04:0;
@@ -3059,7 +3058,7 @@ function drawTruck(car){
  drawCarBadges(car,bx,by,cw,ch);
 }
 function drawLuxury(car){
- if(car.fixed)return;
+ if(car.fixed&&!(car.completionTimer>0))return;
  const bx=tx(car.x),by=ty(car.y),cw=car.w,ch=car.h;
  const shimmer=0.65+0.35*Math.sin(tick*0.07);
  const shimmer2=0.65+0.35*Math.sin(tick*0.07+1.2);
@@ -3155,7 +3154,7 @@ function drawLuxury(car){
  drawCarBadges(car,bx,by,cw,ch);
 }
 function drawBus(car){
- if(car.fixed)return;
+ if(car.fixed&&!(car.completionTimer>0))return;
  const bx=tx(car.x),by=ty(car.y),cw=car.w,ch=car.h;
  const isWorking=car.diagnosed&&car.workProgress>0&&car.workProgress<car.maxWork;
  const sa=isWorking?tick*0.035:0;
@@ -3246,12 +3245,13 @@ function isCarActivelyWorked(car){
  return helpers.some(h=>h.targetCar===car&&(h.state===HELPER_STATES.MOVING||h.state===HELPER_STATES.DIAGNOSING||h.state===HELPER_STATES.FIXING));
 }
 function drawRepairVehicleVisuals(car,bx,by,cw,ch){
- if(!car||car.fixed||!car.problem)return;
+ if(!car||!car.problem)return;
  const active=isCarActivelyWorked(car);
+ const finished=!!car.fixed&&car.completionTimer>0;
  const diagnosed=!!car.diagnosed;
  const name=car.problem.name;
  const pct=Math.max(0,Math.min(1,(car.workProgress||0)/(car.maxWork||1)));
- const phase=!active?0:(pct<0.33?1:(pct<0.66?2:3));
+ const phase=finished?3:(!diagnosed||pct<=0?0:(pct<0.33?1:(pct<0.66?2:3)));
  const phaseLabel=phase===1?'DESMONTANDO':phase===2?'INSTALANDO':phase===3?'AJUSTE FINAL':'';
  const pulse=0.55+0.45*Math.sin(tick*0.18);
  const slow=0.55+0.45*Math.sin(tick*0.08);
@@ -3376,10 +3376,10 @@ function drawRepairVehicleVisuals(car,bx,by,cw,ch){
    ctx.fillStyle=on?`rgba(253,224,71,${phase===3?0.35:(.65+.3*pulse)})`:'rgba(90,90,70,.55)';
    [lx,rx].forEach((x,idx)=>{if(!(phase===1&&idx===1)){ctx.beginPath();ctx.arc(x,ly,phase===2?cw*0.045:cw*0.055,0,Math.PI*2);ctx.fill();}});
  }
- if(active){
+ if(active||finished){
    ctx.fillStyle='rgba(0,0,0,.72)';ctx.beginPath();ctx.roundRect(cx-40,by+ch+8,80,16,4);ctx.fill();
    ctx.fillStyle='#fbbf24';ctx.font="bold 11px 'VT323'";ctx.textAlign='center';
-   ctx.fillText(phaseLabel?`${car.problem.emoji} ${phaseLabel}`:`${car.problem.emoji} EM SERVIÇO`,cx,by+ch+20);
+   ctx.fillText(finished?`${car.problem.emoji} CONCLUÍDO`:phaseLabel?`${car.problem.emoji} ${phaseLabel}`:`${car.problem.emoji} EM SERVIÇO`,cx,by+ch+20);
  }
  ctx.restore();
 }
@@ -3628,7 +3628,11 @@ function update(){
  helpers.forEach(h => updateHelperAI(h));
  WeatherSystem.tickDrops();
  [...cars].forEach(car=>{
- if(car.fixed)return;
+ if(car.fixed){
+   car.completionTimer=(car.completionTimer??90)-1;
+   if(car.completionTimer<=0){const bay=bays.find(b=>b.car===car);if(bay)bay.car=null;const i=cars.indexOf(car);if(i>-1)cars.splice(i,1);}
+   return;
+ }
  car.patienceTimer++;car.patience=1-car.patienceTimer/car.maxPatience;
  if(window._patienceWarn&&car.patience>0&&car.patience<=0.1&&!car._warned){
  car._warned=true;
