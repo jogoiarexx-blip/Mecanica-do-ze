@@ -1613,7 +1613,7 @@ const ACHIEVEMENTS=[
  {id:"no_leave", name:"Ninguem Foi Embora", emoji:"😤", desc:"Um dia inteiro sem perder cliente", req:()=>window._neverLeft===true, reward:500, done:false},
 ];
 let vipCount=0,rainFixes=0,truckFixes=0,motoFixes=0;
-let workedHungryDay=false,hungryWorkTick=0;
+let workedHungryDay=false,hungryWorkTick=0,hungryWorkDayIndex=0;
 let weatherSeen=new Set(["clear"]);
 let maxChainFound=0,loyalCount=0;
 const CLIENT_PERSONALITIES=[
@@ -3606,7 +3606,9 @@ function update(){
  camera.x=Math.max(0,Math.min(shopW-viewW,player.x+player.w/2-viewW/2));
  camera.y=Math.max(0,Math.min(shopH-viewH,player.y+player.h/2-viewH/2));
  if(hunger<20&&tick%90===0)showToast("😵 Com fome! Vá à cantina!");
- if(hunger<10){hungryWorkTick++;if(hungryWorkTick>3600)workedHungryDay=true;}
+ const currentWorkDayIndex=Math.floor(tick/(24*60*4));
+ if(currentWorkDayIndex!==hungryWorkDayIndex){hungryWorkDayIndex=currentWorkDayIndex;hungryWorkTick=0;}
+ if(isOpen()){if(hunger<10){hungryWorkTick++;if(hungryWorkTick>=(window.MZ_CONFIG?.WORKDAY_HUNGRY_TICKS||2880))workedHungryDay=true;}else{hungryWorkTick=0;}}
  if(hasAutoOrder&&tick%300===0&&parts<maxParts){const cost=10;if(money>=cost){money-=cost;parts=Math.min(parts+3,maxParts);}}
  if(window._helperAutoRestock&&helpers.length>0&&tick%3600===0&&parts<maxParts){
  const rcost=Math.floor((window._restockCost||30)*(window._diffPartsCostMult||1))*(maxParts-parts);
@@ -3829,7 +3831,7 @@ function resetGameState(){
  ACHIEVEMENTS.forEach(a=>a.done=false);
  PART_TYPES.forEach(p=>partInventory[p.id]=0);
  vipCount=0;rainFixes=0;truckFixes=0;motoFixes=0;loyalCount=0;
- weatherState="clear";rainDrops=[];weatherSeen=new Set(["clear"]);maxChainFound=0;workedHungryDay=false;hungryWorkTick=0;
+ weatherState="clear";rainDrops=[];weatherSeen=new Set(["clear"]);maxChainFound=0;workedHungryDay=false;hungryWorkTick=0;hungryWorkDayIndex=0;
  dayStartRevenue=totalMoneyEarned;dayStartFix=0;lastReportDay=-1;dayReportData=null;dayReportVisible=false;partsShopVisible=false;_dayHadClientLeave=false;window._neverLeft=false;
  _wasOpen=true;_shownTips.clear();_brokeDay=-1;_brokeWarned=false;
 }
