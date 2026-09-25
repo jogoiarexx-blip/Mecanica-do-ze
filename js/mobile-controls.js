@@ -12,7 +12,7 @@
  function endJoy(e){if(e.pointerId!==pointerId)return;pointerId=null;moveStick(0,0);setJoy(0,0);}
  zone?.addEventListener('pointerdown',startJoy);zone?.addEventListener('pointermove',moveJoy);zone?.addEventListener('pointerup',endJoy);zone?.addEventListener('pointercancel',endJoy);
  function action(name){
-   if(currentGameState!==GAME_STATE.PLAYING)return;
+   if(currentGameState!==GAME_STATE.PLAYING||window.isGameplayBlocked?.())return;
    if(name==='fix')doFix();
    else if(name==='diag'){nearShop()?openPartsShop():doDiagnose();}
    else if(name==='shop'){if(nearCantine())openFoodMenu();else if(nearShop())openPartsShop();else if(!hasCantine&&nearCantineArea())buyCantineInWorld();else doDiagnose();}
