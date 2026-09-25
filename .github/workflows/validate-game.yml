@@ -1,7 +1,7 @@
 name: Validate game
 on:
   push:
-    branches: [main, v3-stability]
+    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read
