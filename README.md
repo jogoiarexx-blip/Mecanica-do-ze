@@ -1,4 +1,4 @@
-# Mecânica do Zé v2.9.0 — Correções PC + Celular
+# Mecânica do Zé v3.0.0 — Correções PC + Celular
 
 Esta versão parte da v2.2 original e mantém o conteúdo do jogo, mas reorganiza o projeto em CSS/JS separados.
 
@@ -109,3 +109,21 @@ Estrutura:
 - partículas também mudam de cor e intensidade conforme defeito e etapa;
 - Zé e ajudante compartilham o mesmo sistema de feedback;
 - cache PWA atualizado para v11.
+
+
+## v3.0.0 — estabilidade e correções completas
+- Save v5: dificuldade, falência e progresso do Workaholic agora pertencem ao slot;
+- corrige multiplicação do hungerDrain após recarregar Chef Contratado;
+- conquistas deixam de vazar entre slots e recompensa/conquista são salvas juntas;
+- cada defeito usa partId explícito, incluindo Bateria, Filtro, Correia e Radiador;
+- ajudante considera desconto de peças ao escolher serviços;
+- reparo visual mantém a etapa entre ações e exibe conclusão antes do carro sair;
+- movimento diagonal do teclado normalizado;
+- cantina mobile ganhou menu completo com todas as comidas desbloqueadas;
+- master/SFX/ambiente corrigidos para evitar volume aplicado em dobro e sons do ajudante foram limitados;
+- Canvas usa devicePixelRatio com viewport lógico, respeitando qualidade gráfica;
+- menu ajustado para telas horizontais pequenas;
+- Workaholic exige uma jornada contínua no mesmo dia, sem acumular entre dias;
+- créditos migrados de setInterval para requestAnimationFrame;
+- modularização inicial: game-config.js e repair-systems.js separados do game.js;
+- PWA atualizado para cache v12.
