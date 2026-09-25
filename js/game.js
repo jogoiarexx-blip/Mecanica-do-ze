@@ -155,7 +155,8 @@ const SFX = (() => {
  let _ctx = null;
  let _master = null;
  let _muted = false;
- let _volume = 0.7;
+ let _volume = 1;
+ let _masterVolume = 0.7;
  let _sfxVolume = 0.8;
  let _ambientVolume = 0.5;
  function _init() {
@@ -163,7 +164,7 @@ const SFX = (() => {
  try {
  _ctx = new (window.AudioContext || window.webkitAudioContext)();
  _master = _ctx.createGain();
- _master.gain.value = _volume;
+ _master.gain.value = _muted ? 0 : _masterVolume;
  _master.connect(_ctx.destination);
  return true;
  } catch(e) { return false; }
@@ -389,12 +390,12 @@ const SFX = (() => {
  _ambientNode = null; _ambientGain = null;
  }
  function setVolume(v) {
- _volume = v;
- if (_master) _master.gain.setTargetAtTime(v, _ctx.currentTime, 0.05);
+ _masterVolume = Math.max(0, Math.min(1, v));
+ if (_master) _master.gain.setTargetAtTime(_muted ? 0 : _masterVolume, _ctx.currentTime, 0.05);
  }
  function setMuted(m) {
  _muted = m;
- if (_master) _master.gain.setTargetAtTime(m ? 0 : _volume, _ctx ? _ctx.currentTime : 0, 0.05);
+ if (_master) _master.gain.setTargetAtTime(m ? 0 : _masterVolume, _ctx ? _ctx.currentTime : 0, 0.05);
  }
  function setSfxVolume(v) { _sfxVolume = Math.max(0, Math.min(1, v)); }
  function setAmbientVolume(v) {
@@ -710,7 +711,7 @@ function calcRepGain(p, v) { return FameSystem.calcRepGain(p, v); }
 function calcRepLoss() { return FameSystem.calcRepLoss(); }
 function checkTierUp() { FameSystem.checkTierUp(); }
 const SaveSystem = (() => {
- const VERSION = 4;
+ const VERSION = window.MZ_CONFIG?.SAVE_VERSION || 5;
  function key(slot) { return `mecanicaze_save_${slot}`; }
  function buildData() {
  return {
@@ -722,10 +723,10 @@ const SaveSystem = (() => {
  gameMinute, tick, spawnTimer, spawnDelay, lastTierIdx: _lastTierIdx,
  weatherTimer, nextWeatherChange,
  dayStartRevenue, dayStartFix, lastReportDay, dayHadClientLeave: _dayHadClientLeave, neverLeft: !!window._neverLeft,
- hunger, stamina, hungerDrain, hasCantine, bay1Bought: !!(window._bay1Bought),
- workedHungryDay, hungryWorkTick, weatherSeen: Array.from(weatherSeen), maxChainFound,
+ hunger, stamina, hasCantine, bay1Bought: !!(window._bay1Bought),
+ workedHungryDay, hungryWorkTick, hungryWorkDayIndex, weatherSeen: Array.from(weatherSeen), maxChainFound,
  vipCount, rainFixes, truckFixes, motoFixes, loyalCount,
- weatherState,
+ weatherState, difficulty: currentDifficulty, brokeDay: _brokeDay, brokeWarned: _brokeWarned,
  partInventory,
  upgrades: upgradesList.filter(u => u.id).map(u => ({ id: u.id, bought: u.bought })),
  missions: missions.map(m => ({ type: m.type, done: m.done, progress: m.progress })),
@@ -752,8 +753,11 @@ const SaveSystem = (() => {
  dayStartRevenue = d.dayStartRevenue ?? d.totalMoneyEarned ?? 200; dayStartFix = d.dayStartFix ?? d.fixCount ?? 0;
  lastReportDay = d.lastReportDay ?? -1; _dayHadClientLeave = d.dayHadClientLeave ?? false; window._neverLeft = d.neverLeft ?? false;
  _lastTierIdx = d.lastTierIdx ?? getFameTierIndex(d.reputation ?? 0);
- hunger = d.hunger ?? 100; hungerDrain = d.hungerDrain ?? hungerDrain;
- workedHungryDay = d.workedHungryDay ?? false; hungryWorkTick = d.hungryWorkTick ?? 0;
+ hunger = d.hunger ?? 100;
+ workedHungryDay = d.workedHungryDay ?? false; hungryWorkTick = d.hungryWorkTick ?? 0; hungryWorkDayIndex = d.hungryWorkDayIndex ?? Math.floor((d.tick ?? 0)/(24*60*4));
+ currentDifficulty = DIFFICULTY_PRESETS[d.difficulty] ? d.difficulty : currentDifficulty;
+ if(typeof applyDifficulty==='function') applyDifficulty();
+ _brokeDay = d.brokeDay ?? -1; _brokeWarned = d.brokeWarned ?? false;
  weatherSeen = new Set(Array.isArray(d.weatherSeen) ? d.weatherSeen : ['clear']);
  maxChainFound = d.maxChainFound ?? 0;
  vipCount = d.vipCount ?? 0; rainFixes = d.rainFixes ?? 0;
@@ -782,7 +786,6 @@ const SaveSystem = (() => {
  const a = ACHIEVEMENTS.find(x => x.id === ad.id);
  if (a) a.done = ad.done;
  });
- if (typeof saveAchievementsToStorage === 'function') saveAchievementsToStorage();
  cars.length = 0; bays.forEach(b => b.car = null);
  if (Array.isArray(d.cars)) d.cars.forEach(sc => {
    const bay = bays[sc.bayIndex]; if (!bay || bay.car) return;
@@ -811,11 +814,11 @@ const SaveSystem = (() => {
  el.style.opacity = 1;
  setTimeout(() => { el.style.opacity = 0; }, 1800);
  }
- function saveToSlot(slot) {
+ function saveToSlot(slot, silent=false) {
  const data = buildData();
  try {
  localStorage.setItem(key(slot), JSON.stringify(data));
- showIndicator();
+ if(!silent)showIndicator();
  currentSlot = slot;
  EventBus.emit('save:saved', { slot });
  } catch(e) {
@@ -828,7 +831,6 @@ const SaveSystem = (() => {
  if (v > VERSION) throw new Error('Save de versão futura');
  if (v < 3) {
  data.stamina = data.stamina ?? data.maxStamina ?? 100;
- data.hungerDrain = data.hungerDrain ?? 0.008;
  data.weatherSeen = Array.isArray(data.weatherSeen) ? data.weatherSeen : ['clear'];
  }
  if (v < 4) {
@@ -837,6 +839,12 @@ const SaveSystem = (() => {
  data.dayStartRevenue = data.dayStartRevenue ?? data.totalMoneyEarned ?? 200;
  data.dayStartFix = data.dayStartFix ?? data.fixCount ?? 0; data.lastReportDay = data.lastReportDay ?? -1;
  data.cars = Array.isArray(data.cars) ? data.cars : [];
+ }
+ if (v < 5) {
+   delete data.hungerDrain;
+   data.difficulty = data.difficulty || localStorage.getItem('mecanicaze_difficulty') || 'normal';
+   data.brokeDay = data.brokeDay ?? -1; data.brokeWarned = data.brokeWarned ?? false;
+   data.hungryWorkDayIndex = data.hungryWorkDayIndex ?? Math.floor((data.tick ?? 0)/(24*60*4));
  }
  data.v = VERSION;
  return data;
@@ -874,8 +882,8 @@ const SaveSystem = (() => {
  }, 60000);
  return { saveToSlot, loadFromSlot, deleteSlot, getSlotInfo, showIndicator };
 })();
-const SAVE_VERSION = 4;
-function saveToSlot(slot) { SaveSystem.saveToSlot(slot); }
+const SAVE_VERSION = window.MZ_CONFIG?.SAVE_VERSION || 5;
+function saveToSlot(slot, silent=false) { SaveSystem.saveToSlot(slot, silent); }
 function loadFromSlot(slot) { return SaveSystem.loadFromSlot(slot); }
 function deleteSlot(slot) { SaveSystem.deleteSlot(slot); }
 function getSlotInfo(slot) { return SaveSystem.getSlotInfo(slot); }
@@ -927,8 +935,7 @@ function showAchievementToast(ach) {
  if(typeof SFX !== 'undefined') SFX.missionComplete();
 }
 function openAchievements() {
- if(typeof loadAchievementsFromStorage === 'function') loadAchievementsFromStorage();
- if(typeof checkAchievements === 'function') checkAchievements();
+ if(typeof loadAchievementsFromStorage === 'function') if(typeof checkAchievements === 'function') checkAchievements();
  renderAchievements();
  document.getElementById('achievements-screen').style.display = 'flex';
  if(typeof SFX !== 'undefined') SFX.uiClick();
@@ -1095,6 +1102,7 @@ window.openCredits = openCredits;
 window.closeCredits = closeCredits;
 window.checkAchievements= checkAchievements;
 (function loadSettings() {
+ try{localStorage.removeItem('mecanicaze_ach_v3');}catch(e){}
  const diff = localStorage.getItem('mecanicaze_difficulty') || 'normal';
  currentDifficulty = diff;
  const q = localStorage.getItem('mecanicaze_quality') || 'media';
@@ -1111,8 +1119,7 @@ window.checkAchievements= checkAchievements;
  const sv = +(localStorage.getItem('mecanicaze_sfx_volume') ?? 80);
  const av = +(localStorage.getItem('mecanicaze_ambient_volume') ?? 50);
  setTimeout(() => { setMasterVolume(mv); setSfxVolume(sv); setAmbientVolume(av); setMuteAll(localStorage.getItem('mecanicaze_muted')==='1'); }, 0);
- if(typeof loadAchievementsFromStorage === "function") loadAchievementsFromStorage();
-})();
+ if(typeof loadAchievementsFromStorage === "function")})();
 const HELPER_STATES = {
  IDLE: 'idle',
  MOVING: 'moving',
@@ -1131,12 +1138,13 @@ function helperScoreCar(car) {
  if (car.vtype?.id === 'truck') score += 15;
  if (car.vtype?.id === 'luxury') score += 20;
  const prob = car.problem;
- const partNeeded = PART_TYPES.find(pt => pt.forProblems.includes(prob.name));
+ const partNeeded = getProblemPart(prob);
  const shopActive = upgradesList.find(u => u.id === 'shop1')?.bought;
+ const actualNeeds=Math.max(1,car.needsParts-(window._partsDiscount||0));
  if (shopActive && partNeeded) {
- if ((partInventory[partNeeded.id] || 0) < car.needsParts) score -= 50;
+ if ((partInventory[partNeeded.id] || 0) < actualNeeds) score -= 50;
  } else {
- if (parts < car.needsParts) score -= 50;
+ if (parts < actualNeeds) score -= 50;
  }
  return score;
 }
@@ -1231,7 +1239,7 @@ function updateHelperAI(h) {
  if (!car || car.fixed || car.patience <= 0) { h.state = HELPER_STATES.IDLE; h.targetCar = null; return; }
  if (!car.diagnosed) { h.state = HELPER_STATES.DIAGNOSING; h.stateTimer = 0; return; }
  var prob = car.problem;
- var partNeeded = PART_TYPES.find(function(pt) { return pt.forProblems.includes(prob.name); });
+ var partNeeded = getProblemPart(prob);
  var shopActive = upgradesList.find(function(u) { return u.id === 'shop1'; });
  shopActive = shopActive && shopActive.bought;
  var actualNeeds = Math.max(1, car.needsParts - (window._partsDiscount||0));
@@ -1250,7 +1258,7 @@ function updateHelperAI(h) {
  h.frame = Math.floor(h.stateTimer / 6) % 4;
  if (h.stateTimer % 10 === 0) {
  const helperStage=getRepairStage(car);
- if(h.stateTimer%20===0) SFX.repair(car.problem.name,helperStage);
+ if(tick-(h._lastRepairSoundTick??-999)>=45){SFX.repair(car.problem.name,helperStage);h._lastRepairSoundTick=tick;}
  const hfx=getRepairFx(car.problem.name,helperStage);
  const hpos=getRepairEffectPoint(car,'fix',h);
  spawnParticles(hpos.x,hpos.y,hfx.color,Math.max(2,Math.floor(hfx.count/2)));
@@ -1271,7 +1279,7 @@ function updateHelperAI(h) {
  var arrived = helperMoveToward(h, shelf.x + shelf.w/2, shelf.y + shelf.h/2, 2.3);
  if (arrived || helperNearTarget(h, shelf.x + shelf.w/2, shelf.y + shelf.h/2, 75)) {
  const target = h.restockTarget;
- const specificPart = target ? PART_TYPES.find(pt => pt.forProblems.includes(target.problem.name)) : null;
+ const specificPart = target ? getProblemPart(target.problem) : null;
  const shopActiveNow = upgradesList.find(u=>u.id==='shop1')?.bought;
  if (target && shopActiveNow && specificPart) {
    const needTotal = Math.max(1, target.needsParts - (window._partsDiscount||0));
@@ -1296,7 +1304,7 @@ function updateHelperAI(h) {
  }
  if (h.restockTarget && !h.restockTarget.fixed) {
  const nextTarget = h.restockTarget;
- const nextPart = PART_TYPES.find(pt => pt.forProblems.includes(nextTarget.problem.name));
+ const nextPart = getProblemPart(nextTarget.problem);
  const nextNeeds = Math.max(1, nextTarget.needsParts - (window._partsDiscount||0));
  const nextShopActive = upgradesList.find(u=>u.id==='shop1')?.bought;
  const readyToFix = nextShopActive && nextPart
@@ -1550,7 +1558,8 @@ let diagnosticLevel=1,toolQuality=1,reputationMult=1;
 let gameMinute=8*60,tick=0;
 let carsDone=0,totalMoneyEarned=200;
 let hunger=100,maxHunger=100; 
-let hungerDrain=0.008; 
+const BASE_HUNGER_DRAIN=window.MZ_CONFIG?.BASE_HUNGER_DRAIN??0.008;
+let hungerDrain=BASE_HUNGER_DRAIN; 
 let foodItems=[{name:"☕ Café",cost:15,hunger:20},{name:"🥪 Sanduíche",cost:35,hunger:50},{name:"🍱 Marmita",cost:60,hunger:100}];
 let hasCantine=false; 
 let dayReportData=null;
@@ -1563,12 +1572,12 @@ let partsShopVisible=false;
 const PART_TYPES=[
  {id:"pastilha", name:"Pastilha de Freio", emoji:"🛑", cost:25, stock:5, forProblems:["Freio"]},
  {id:"pneu", name:"Pneu", emoji:"🔄", cost:20, stock:5, forProblems:["Pneu","Aquaplanagem"]},
- {id:"oleo", name:"Óleo de Motor", emoji:"🛢️", cost:30, stock:5, forProblems:["Motor","Óleo"]},
- {id:"vela", name:"Vela de Ignição", emoji:"⚡", cost:35, stock:5, forProblems:["Elétrica","Bateria"]},
- {id:"correia", name:"Correia Dentada", emoji:"⚙️", cost:55, stock:3, forProblems:["Transmissão","Motor"]},
- {id:"radiador", name:"Radiador", emoji:"🌡️", cost:80, stock:2, forProblems:["Superaquecimento"]},
- {id:"filtro", name:"Filtro de Ar", emoji:"💨", cost:18, stock:8, forProblems:["Óleo","Motor"]},
- {id:"bateria", name:"Bateria", emoji:"🔋", cost:90, stock:2, forProblems:["Bateria","Elétrica"]},
+ {id:"oleo", name:"Óleo de Motor", emoji:"🛢️", cost:30, stock:5, forProblems:["Óleo"]},
+ {id:"vela", name:"Vela/Elétrica", emoji:"⚡", cost:35, stock:5, forProblems:["Elétrica","Farol"]},
+ {id:"correia", name:"Correia Dentada", emoji:"⚙️", cost:55, stock:3, forProblems:["Transmissão","Correia"]},
+ {id:"radiador", name:"Radiador", emoji:"🌡️", cost:80, stock:2, forProblems:["Superaquecimento","Radiador"]},
+ {id:"filtro", name:"Filtro de Ar", emoji:"💨", cost:18, stock:8, forProblems:["Motor"]},
+ {id:"bateria", name:"Bateria", emoji:"🔋", cost:90, stock:2, forProblems:["Bateria"]},
 ];
 let partInventory={}; 
 PART_TYPES.forEach(p=>partInventory[p.id]=0);
@@ -1743,21 +1752,10 @@ function getDayTip(){
  return tips[Math.floor(Math.random()*tips.length)];
 }
 function saveAchievementsToStorage(){
- try{
- const data=ACHIEVEMENTS.map(a=>({id:a.id,done:a.done}));
- localStorage.setItem('mecanicaze_ach_v3',JSON.stringify(data));
- }catch(e){}
+ if(currentSlot===null)return;
+ try{saveToSlot(currentSlot,true);}catch(e){}
 }
-function loadAchievementsFromStorage(){
- try{
- const raw=localStorage.getItem('mecanicaze_ach_v3');
- if(!raw)return;
- JSON.parse(raw).forEach(ad=>{
- const a=ACHIEVEMENTS.find(x=>x.id===ad.id);
- if(a&&ad.done)a.done=true;
- });
- }catch(e){}
-}
+function loadAchievementsFromStorage(){ /* v5: conquistas pertencem exclusivamente ao slot */ }
 function checkAchievements(){
  ACHIEVEMENTS.forEach(a=>{
  if(a.done)return;
@@ -1793,19 +1791,23 @@ const missions=[
  {text:"👑 Fama Imortal (1000)", done:false,target:1000,type:"rep", progress:0, reward:3000},
 ];
 const problems=[
- {name:"Motor", emoji:"⚙️", time:180,base:150,parts:2,color:"#ef4444", chainProbs:["Óleo","Superaquecimento"]},
- {name:"Freio", emoji:"🛑", time:100,base:80, parts:1,color:"#f97316", chainProbs:["Pneu"]},
- {name:"Pneu", emoji:"🔄", time:60, base:50, parts:1,color:"#eab308", chainProbs:[]},
- {name:"Elétrica", emoji:"⚡", time:140,base:120,parts:2,color:"#60a5fa", chainProbs:["Bateria"]},
- {name:"Óleo", emoji:"🛢️", time:80, base:60, parts:1,color:"#84cc16", chainProbs:[]},
- {name:"Transmissão", emoji:"⚙️", time:200,base:200,parts:3,color:"#a78bfa", chainProbs:["Motor","Correia"]},
- {name:"Bateria", emoji:"🔋", time:90, base:95, parts:1,color:"#facc15", chainProbs:["Elétrica"]},
- {name:"Superaquecimento",emoji:"🌡️",time:130,base:130,parts:2,color:"#f87171", chainProbs:["Radiador"]},
- {name:"Aquaplanagem", emoji:"💧", time:70, base:65, parts:1,color:"#38bdf8", chainProbs:["Pneu"], weatherOnly:"rain"},
- {name:"Correia", emoji:"🔗", time:160,base:175,parts:2,color:"#c084fc", chainProbs:[]},
- {name:"Farol", emoji:"💡", time:55, base:45, parts:1,color:"#fde68a", chainProbs:[]},
- {name:"Radiador", emoji:"💨", time:110,base:110,parts:2,color:"#fb7185", chainProbs:[]},
+ {name:"Motor", partId:"filtro", emoji:"⚙️", time:180,base:150,parts:2,color:"#ef4444", chainProbs:["Óleo","Superaquecimento"]},
+ {name:"Freio", partId:"pastilha", emoji:"🛑", time:100,base:80, parts:1,color:"#f97316", chainProbs:["Pneu"]},
+ {name:"Pneu", partId:"pneu", emoji:"🔄", time:60, base:50, parts:1,color:"#eab308", chainProbs:[]},
+ {name:"Elétrica", partId:"vela", emoji:"⚡", time:140,base:120,parts:2,color:"#60a5fa", chainProbs:["Bateria"]},
+ {name:"Óleo", partId:"oleo", emoji:"🛢️", time:80, base:60, parts:1,color:"#84cc16", chainProbs:[]},
+ {name:"Transmissão", partId:"correia", emoji:"⚙️", time:200,base:200,parts:3,color:"#a78bfa", chainProbs:["Motor","Correia"]},
+ {name:"Bateria", partId:"bateria", emoji:"🔋", time:90, base:95, parts:1,color:"#facc15", chainProbs:["Elétrica"]},
+ {name:"Superaquecimento", partId:"radiador",emoji:"🌡️",time:130,base:130,parts:2,color:"#f87171", chainProbs:["Radiador"]},
+ {name:"Aquaplanagem", partId:"pneu", emoji:"💧", time:70, base:65, parts:1,color:"#38bdf8", chainProbs:["Pneu"], weatherOnly:"rain"},
+ {name:"Correia", partId:"correia", emoji:"🔗", time:160,base:175,parts:2,color:"#c084fc", chainProbs:[]},
+ {name:"Farol", partId:"vela", emoji:"💡", time:55, base:45, parts:1,color:"#fde68a", chainProbs:[]},
+ {name:"Radiador", partId:"radiador", emoji:"💨", time:110,base:110,parts:2,color:"#fb7185", chainProbs:[]},
 ];
+function getProblemPart(problem){
+ if(!problem)return null;
+ return PART_TYPES.find(pt=>pt.id===problem.partId) || PART_TYPES.find(pt=>pt.forProblems.includes(problem.name)) || null;
+}
 const carColors=["#e11d48","#2563eb","#059669","#d97706","#7c3aed","#0891b2","#be185d","#374151","#f5f5f5","#92400e"];
 const camera={x:0,y:0};
 const player={x:400,y:600,w:22,h:32,dir:"down",frame:0,frameTimer:0};
@@ -2003,9 +2005,9 @@ function restoreArray(target, base){
 }
 function resetUpgradeDerivedState(){
  UPGRADE_FLAG_KEYS.forEach(k=>{try{delete window[k];}catch(e){window[k]=undefined;}});
- playerSpeed=3.5;maxStamina=100;staminaDrain=0.05;staminaRegen=0.04;hungerDrain=0.008;
+ playerSpeed=3.5;maxStamina=100;staminaDrain=0.05;staminaRegen=0.04;hungerDrain=BASE_HUNGER_DRAIN;
  maxParts=20;hasAutoOrder=false;hasHelper=false;diagnosticLevel=1;toolQuality=1;reputationMult=1;
- spawnDelay=1800;hungerDrain=0.008;hasCantine=false;
+ spawnDelay=1800;hungerDrain=BASE_HUNGER_DRAIN;hasCantine=false;
  restoreArray(VEHICLE_TYPES,BASE_VEHICLES);
  restoreArray(CLIENT_PERSONALITIES,BASE_CLIENTS);
  restoreArray(PART_TYPES,BASE_PART_TYPES);
@@ -2235,7 +2237,7 @@ let actionCooldown=0;
 let fixingCar=null,fixTimer=0;
 function hasRepairParts(car,showError=true){
  const prob=car.problem;
- const partNeeded=PART_TYPES.find(pt=>pt.forProblems.includes(prob.name));
+ const partNeeded=getProblemPart(prob);
  const actualNeeds=Math.max(1,car.needsParts-(window._partsDiscount||0));
  if(partNeeded && upgradesList.find(u=>u.id==='shop1')?.bought){
   const have=partInventory[partNeeded.id]||0;
@@ -2276,7 +2278,7 @@ function completeFix(car,bay){
  if(car.fixed)return;
  car.fixed=true;bay.car=null;
  const prob=car.problem;
- const partNeeded=PART_TYPES.find(pt=>pt.forProblems.includes(prob.name));
+ const partNeeded=getProblemPart(prob);
  const actualNeeds=Math.max(1,car.needsParts-(window._partsDiscount||0));
  if(partNeeded && upgradesList.find(u=>u.id==="shop1")?.bought){
    partInventory[partNeeded.id]=Math.max(0,(partInventory[partNeeded.id]||0)-actualNeeds);
@@ -3801,7 +3803,7 @@ function resetGameState(){
  money=200;reputation=0;fixCount=0;carsDone=0;totalMoneyEarned=200;
  parts=20;maxParts=20;hasAutoOrder=false;hasHelper=false;
  playerSpeed=3.5;maxStamina=100;stamina=100;hunger=100;hasCantine=false;
- staminaDrain=0.05;staminaRegen=0.04;
+ staminaDrain=0.05;staminaRegen=0.04;hungerDrain=BASE_HUNGER_DRAIN;
  diagnosticLevel=1;toolQuality=1;reputationMult=1;
  gameMinute=8*60;tick=0;spawnDelay=1800;spawnTimer=0; weatherTimer=0;nextWeatherChange=1800;
  _lastTierIdx=0;_tierUpAnim=null; actionCooldown=0;fixingCar=null;fixTimer=0;playerAction=null;playerActionTimer=0;playerWorkTask=null;
@@ -3828,7 +3830,6 @@ function tickGameTimeouts(){
 }
 function clearGameTimeouts(){_gameTimeouts.clear();}
 function startGame(){
- loadAchievementsFromStorage();
  if(typeof applyDifficulty === "function") applyDifficulty();
  document.getElementById("save-screen").style.display="none";
  document.getElementById("tutorial").style.display="none";
