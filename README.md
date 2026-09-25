@@ -1,4 +1,4 @@
-# Mecânica do Zé v3.1.0 — Correções PC + Celular
+# Mecânica do Zé v3.1.1 — Correções PC + Celular
 
 Esta versão parte da v2.2 original e mantém o conteúdo do jogo, mas reorganiza o projeto em CSS/JS separados.
 
@@ -155,3 +155,13 @@ Estrutura:
 - PWA mostra aviso de nova versão e cache atualizado para v14.
 - ico1000.png removido por não ser utilizado.
 - CI ganhou smoke test real com Playwright.
+
+
+## v3.1.1 — sprite proporcional da cantina
+- removido o excesso de objetos do kit visual: o jogo usa somente a cantina principal;
+- sprite recortado com fundo transparente e otimizado em WebP (114×100);
+- cantina renderizada proporcionalmente em 200×175 no mapa, sem achatamento;
+- área reposicionada para não invadir a fila de espera;
+- desenho procedural antigo permanece somente como fallback caso o sprite não carregue;
+- interação e fome continuam funcionando normalmente;
+- PWA atualizado para cache v15.
