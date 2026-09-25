@@ -1,4 +1,4 @@
-const CACHE_NAME='mecanica-ze-v14';
+const CACHE_NAME='mecanica-ze-v15';
 const PRECACHE=[
  './','./index.html','./manifest.json',
  './css/game.css','./css/mobile.css',
@@ -6,7 +6,7 @@ const PRECACHE=[
  './js/game-config.js',
  './js/repair-systems.js','./js/mobile-controls.js','./js/pwa.js',
  './icon-192.png','./icon-512.png',
- './assets/sprites/ze.png','./assets/sprites/ajudante.png','./assets/sprites/actions.png'
+ './assets/sprites/ze.png','./assets/sprites/ajudante.png','./assets/sprites/actions.png','./assets/sprites/cantina-data.js'
 ];
 self.addEventListener('install',event=>{
  event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.addAll(PRECACHE)));
