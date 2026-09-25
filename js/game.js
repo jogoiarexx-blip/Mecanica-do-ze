@@ -2371,9 +2371,9 @@ function doRestock(){
  spawnParticles(shelf.x+shelf.w/2,shelf.y,"#60a5fa",8);
 }
 function doEat(itemIdx){
- if(!nearCantine()){showToast("Vá até a Cantina! 🍔");return;}
+ if(!nearCantine()){showToast("Vá até a Cantina! 🍔");return false;}
  const item=foodItems[itemIdx]||foodItems[0];
- if(money<item.cost){showToast(`Sem grana para ${item.name}! 💸`);return;}
+ if(money<item.cost){showToast(`Sem grana para ${item.name}! 💸`);return false;}
  money-=item.cost;
  hunger=Math.min(maxHunger,hunger+item.hunger);
  if(item.stamina){stamina=Math.min(maxStamina,stamina+item.stamina);}
@@ -2384,6 +2384,8 @@ function doEat(itemIdx){
  updateHUD();
  spawnParticles(player.x+player.w/2,player.y,"#84cc16",6);
  spawnFloatText(player.x+player.w/2,player.y-20,`${item.name} +${item.hunger}🍴`,"#84cc16");
+ if(hunger>=10)hungryWorkTick=0;
+ return true;
 }
 window.doEat=doEat;
 window.openPartsShop=openPartsShop;
