@@ -151,6 +151,21 @@ function isGamePlaying() { return GameState.isPlaying(); }
 function isGamePaused() { return GameState.isPaused(); }
 function pauseGame() { GameState.pause(); }
 function resumeGame() { GameState.resume(); }
+const OverlayManager = (() => {
+ const blocking = new Set();
+ function open(id){ blocking.add(id); if(typeof clearInputState==='function')clearInputState(); }
+ function close(id){ blocking.delete(id); }
+ function isBlocking(){ return blocking.size>0; }
+ function reset(){ blocking.clear(); }
+ function closeAll(){
+  ['parts-shop-modal','cantine-menu-modal','day-report-modal'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
+  blocking.clear();
+  if(typeof clearInputState==='function')clearInputState();
+ }
+ return {open,close,isBlocking,reset,closeAll};
+})();
+function isGameplayBlocked(){ return OverlayManager.isBlocking(); }
+window.isGameplayBlocked=isGameplayBlocked;
 const SFX = (() => {
  let _ctx = null;
  let _master = null;
@@ -446,7 +461,7 @@ const SFX = (() => {
  if (!_init() || _radioNode) return;
  _resume();
  _radioGain = _ctx.createGain();
- _radioGain.gain.value = 0.7;
+ _radioGain.gain.value = (typeof _pauseRadioVolume!=='undefined'?_pauseRadioVolume:0.7)*0.7;
  const bp = _ctx.createBiquadFilter();
  bp.type = 'bandpass'; bp.frequency.value = 1200; bp.Q.value = 0.7;
  const dist = _ctx.createWaveShaper();
@@ -490,7 +505,21 @@ EventBus.on('game:start', () => { SFX.startAmbient(); if (typeof upgradesList !=
 EventBus.on('game:resume', () => { SFX.startAmbient(); });
 EventBus.on('game:pause', () => { SFX.stopAmbient(); });
 EventBus.on('game:returnMenu', () => { SFX.stopAmbient(); SFX.stopRadio(); });
-function toggleMissions(){SFX.uiClick();document.getElementById("task-board").classList.toggle("open");}
+function closeUpgradePanel(){
+ const p=document.getElementById('upgrade-panel');if(p)p.classList.remove('open');
+ ['oficina','negocio','equipe'].forEach(t=>{const b=document.getElementById('tab-btn-'+t);if(b){b.classList.remove('active');b.setAttribute('aria-expanded','false');}});
+}
+function closeSidePanels(except=''){
+ if(except!=='missions'){const m=document.getElementById('task-board');if(m)m.classList.remove('open');}
+ if(except!=='upgrades')closeUpgradePanel();
+ if(except!=='bills'&&typeof BillsSystem!=='undefined'&&BillsSystem.closePanel)BillsSystem.closePanel();
+}
+function toggleMissions(){
+ const board=document.getElementById('task-board');if(!board)return;
+ const opening=!board.classList.contains('open');
+ if(opening)closeSidePanels('missions');
+ board.classList.toggle('open');SFX.uiClick();
+}
 window.toggleMissions=toggleMissions;
 document.getElementById("sound-toggle").addEventListener("click", () => {
  SFX._init();
@@ -1149,7 +1178,7 @@ function helperScoreCar(car) {
  const shopActive = upgradesList.find(u => u.id === 'shop1')?.bought;
  const actualNeeds=Math.max(1,car.needsParts-(window._partsDiscount||0));
  if (shopActive && partNeeded) {
- if ((partInventory[partNeeded.id] || 0) < actualNeeds) score -= 50;
+ if ((partInventory[partNeeded.id] || 0) < actualNeeds || parts < 1) score -= 50;
  } else {
  if (parts < actualNeeds) score -= 50;
  }
@@ -1238,6 +1267,7 @@ function updateHelperAI(h) {
  var _diagDur = Math.ceil(65 / (window._helperDiagSpeed||1));
  if (h.stateTimer >= _diagDur) {
  car.diagnosed = true;
+ if(diagnosticLevel>=3)resolveChainProblems(car);
  h.state = HELPER_STATES.FIXING;
  h.stateTimer = 0;
  }
@@ -1251,7 +1281,7 @@ function updateHelperAI(h) {
  shopActive = shopActive && shopActive.bought;
  var actualNeeds = Math.max(1, car.needsParts - (window._partsDiscount||0));
  var hasEnoughParts = shopActive && partNeeded
- ? (partInventory[partNeeded.id] || 0) >= actualNeeds
+ ? (partInventory[partNeeded.id] || 0) >= actualNeeds && parts >= 1
  : parts >= actualNeeds;
  if (!hasEnoughParts) {
  h.speech = '📦 Sem peças! Vou buscar...';
@@ -1294,6 +1324,7 @@ function updateHelperAI(h) {
    const unit = getPartUnitCost(specificPart);
    const qty = Math.min(missing, Math.floor(money / unit));
    if (qty > 0) { money -= qty*unit; partInventory[specificPart.id]=(partInventory[specificPart.id]||0)+qty; SFX.restock(); updateHUD(); }
+   if(parts<1){const genericUnit=Math.max(1,Math.floor((window._restockCost||30)*(window._diffPartsCostMult||1)));if(money>=genericUnit){money-=genericUnit;parts=1;SFX.restock();updateHUD();}}
    if (qty < missing) { h.speech='💸 Falta grana pra peça!'; h.speechTimer=80; }
    else { showToast(`🤖 Comprou ${specificPart.emoji} ${specificPart.name}!`); }
  } else if (parts < maxParts) {
@@ -1315,7 +1346,7 @@ function updateHelperAI(h) {
  const nextNeeds = Math.max(1, nextTarget.needsParts - (window._partsDiscount||0));
  const nextShopActive = upgradesList.find(u=>u.id==='shop1')?.bought;
  const readyToFix = nextShopActive && nextPart
-   ? (partInventory[nextPart.id]||0) >= nextNeeds
+   ? (partInventory[nextPart.id]||0) >= nextNeeds && parts >= 1
    : parts >= nextNeeds;
  if (readyToFix) {
    h.targetCar = nextTarget;
@@ -1582,7 +1613,7 @@ const ACHIEVEMENTS=[
  {id:"moto10", name:"Motoqueiro", emoji:"🏍️", desc:"Consertou 10 motos", req:()=>motoFixes>=10, reward:200, done:false},
  {id:"nofood", name:"Workaholic", emoji:"😤", desc:"Trabalhou com fome o dia todo", req:()=>workedHungryDay, reward:150, done:false},
  {id:"allweather", name:"Tempo Perfeito", emoji:"🌈", desc:"Trabalhou com todos os tipos de clima",req:()=>weatherSeen.size>=4, reward:500, done:false},
- {id:"chain3", name:"Cascata!", emoji:"💥", desc:"Detectou 3 falhas em cadeia num carro",req:()=>maxChainFound>=3, reward:600, done:false},
+ {id:"chain3", name:"Cascata!", emoji:"💥", desc:"Detectou 2 falhas em cadeia num carro",req:()=>maxChainFound>=2, reward:600, done:false},
  {id:"rep100", name:"Popular", emoji:"🌟", desc:"Fama chegou a 100", req:()=>reputation>=100, reward:300, done:false},
  {id:"rep500", name:"Lendario", emoji:"🔥", desc:"Fama chegou a 500", req:()=>reputation>=500, reward:1000, done:false},
  {id:"rep1000", name:"IMORTAL", emoji:"👑", desc:"Fama chegou a 1000", req:()=>reputation>=1000, reward:3000, done:false},
@@ -1609,22 +1640,18 @@ const VEHICLE_TYPES=[
  {id:"luxury", name:"Luxo", emoji:"🏎️", sizeW:160,sizeH:95, payMult:2.8, repMult:2.0, freq:0.10, drawFn:"drawLuxury"},
  {id:"bus", name:"Van", emoji:"🚐", sizeW:175,sizeH:105, payMult:1.7, repMult:1.3, freq:0.05, drawFn:"drawBus"},
 ];
-const CHAIN_PROBLEMS={
- "Motor": ["Óleo","Superaquecimento"],
- "Transmissão":["Motor","Correia"],
- "Elétrica": ["Bateria","Farol"],
- "Freio": ["Pneu"],
-};
+function isPartsShopUnlocked(){return !!upgradesList.find(u=>u.id==='shop1'&&u.bought);}
 function openPartsShop(){
  if(!nearShop()){showToast("Vá até a Loja de Peças! 🏪");return;}
- partsShopVisible=true;
+ if(!isPartsShopUnlocked()){SFX.error();showToast("🔒 Compre o upgrade Loja de Peças primeiro!");return;}
+ partsShopVisible=true;OverlayManager.open('parts-shop-modal');
  const modal=document.getElementById("parts-shop-modal");
  if(modal)modal.style.display="flex";
  renderPartsShop();
  const bal=document.getElementById("shop-balance");
  if(bal)bal.textContent="$"+money;
 }
-function closePartsShop(){partsShopVisible=false;const modal=document.getElementById("parts-shop-modal");if(modal)modal.style.display="none";}
+function closePartsShop(){partsShopVisible=false;OverlayManager.close('parts-shop-modal');const modal=document.getElementById("parts-shop-modal");if(modal)modal.style.display="none";}
 window.closePartsShop=closePartsShop;
 function nearShop(){
  const dx=player.x+player.w/2-(partsShopArea.x+partsShopArea.w/2);
@@ -1669,13 +1696,13 @@ function renderPartsShop(){
 }
 function openDayReport(){
  if(!dayReportData)return;
- dayReportVisible=true;
+ dayReportVisible=true;OverlayManager.open('day-report-modal');
  renderDayReport();
  const modal=document.getElementById("day-report-modal");
  if(modal)modal.style.display="flex";
 }
 function closeDayReport(){
- dayReportVisible=false;dayReportData=null;
+ dayReportVisible=false;dayReportData=null;OverlayManager.close('day-report-modal');
  const modal=document.getElementById("day-report-modal");
  if(modal)modal.style.display="none";
 }
@@ -1760,6 +1787,8 @@ function checkAchievements(){
  });
 }
 const cars=[];
+const waitingCars=[];
+const MAX_WAITING_CARS=4;
 const particles=[];
 const floatTexts=[];
 const helpers=[];
@@ -1820,8 +1849,8 @@ const cantineArea={x:400,y:840,w:160,h:80};
 let spawnTimer=0,spawnDelay=1800;
 const upgradesList=[
  {section:"🔧 FERRAMENTAS"},
- {id:"tool1", name:"🔧 Chave de Impacto", desc:"Reparo mais rápido + velocidade", cost:300, bought:false,
- fn:()=>{staminaDrain=Math.max(0.02,staminaDrain*0.8);playerSpeed+=0.5;}},
+ {id:"tool1", name:"🔧 Chave de Impacto", desc:"+25% progresso por ação + velocidade", cost:300, bought:false,
+ fn:()=>{window._playerRepairSpeedMult=1.25;playerSpeed+=0.5;}},
  {id:"tool2", name:"🛠️ Kit Profissional", desc:"2× velocidade de conserto", cost:700, reqFame:10, bought:false, req:"tool1",
  fn:()=>{toolQuality=2;}},
  {id:"tool2b", name:"⚙️ Kit Master", desc:"3× velocidade de conserto", cost:1400, reqFame:50, bought:false, req:"tool2",
@@ -1830,8 +1859,8 @@ const upgradesList=[
  fn:()=>{diagnosticLevel=2;}},
  {id:"tool4", name:"🔬 Scanner Pro", desc:"Revela falhas em cadeia", cost:900, reqFame:25, bought:false, req:"tool3",
  fn:()=>{diagnosticLevel=3;}},
- {id:"tool5", name:"🧲 Macaco Hidráulico", desc:"Reduz stamina gasta por conserto", cost:600, reqFame:10, bought:false,
- fn:()=>{staminaDrain=Math.max(0.015,staminaDrain*0.6);}},
+ {id:"tool5", name:"🧲 Macaco Hidráulico", desc:"Consertos gastam 40% menos stamina", cost:600, reqFame:10, bought:false,
+ fn:()=>{window._fixStaminaMult=Math.min(window._fixStaminaMult||1,0.6);}},
  {section:"📦 ESTOQUE & PEÇAS"},
  {id:"parts1", name:"📦 Estoque Ampliado", desc:"Capacidade 40 peças", cost:400, bought:false,
  fn:()=>{maxParts=40;parts=Math.min(parts+20,40);}},
@@ -1948,7 +1977,7 @@ const upgradesList=[
  {id:"diag1", name:"🎯 Diagnóstico Rápido", desc:"Cooldown de diagnóstico cai à metade", cost:300, bought:false,
  fn:()=>{window._diagCooldownMult=0.5;}},
  {id:"fix_stamina",name:"💪 Luvas de Proteção", desc:"Consertos gastam 30% menos stamina", cost:400, reqFame:10, bought:false,
- fn:()=>{window._fixStaminaMult=0.7;}},
+ fn:()=>{window._fixStaminaMult=Math.min(window._fixStaminaMult||1,0.7);}},
  {section:"🍕 ALIMENTAÇÃO AVANÇADA"},
  {id:"food1", name:"🧃 Isotônico", desc:"Nova opção na cantina: +30 stamina por $25", cost:300, reqFame:25, bought:false, req:"cantine",
  fn:()=>{foodItems.push({name:"🧃 Isotônico",cost:25,hunger:30,stamina:30});}},
@@ -1985,7 +2014,7 @@ const BASE_VEHICLES = VEHICLE_TYPES.map(v=>({...v}));
 const BASE_CLIENTS = CLIENT_PERSONALITIES.map(v=>({...v}));
 const BASE_PART_TYPES = PART_TYPES.map(v=>({...v,forProblems:[...v.forProblems]}));
 const BASE_FOOD_ITEMS = foodItems.map(v=>({...v}));
-const UPGRADE_FLAG_KEYS = ['_bay1Bought','_nightSpeedBonus','_thermosBonus','_vipMult','_loyalPatienceMult','_rainPayBonus','_stormPatienceBonus','_solarToldo','_acBonus','_weekendBonus','_cardBonus','_dayReportBonus','_missionMoneyBonus','_chainHint','_chainValueMult','_chainChance','_patienceWarn','_halfRepLoss','_voucherReturn','_cooldownMult','_diagCooldownMult','_fixStaminaMult','_fameBonusPerFix','_vipFameBonus','_partsDiscount','_restockCost','_helperAutoRestock','_helperSpeedMult','_helperDiagSpeed'];
+const UPGRADE_FLAG_KEYS = ['_bay1Bought','_nightSpeedBonus','_thermosBonus','_vipMult','_loyalPatienceMult','_rainPayBonus','_stormPatienceBonus','_solarToldo','_acBonus','_weekendBonus','_cardBonus','_dayReportBonus','_missionMoneyBonus','_chainHint','_chainValueMult','_chainChance','_patienceWarn','_halfRepLoss','_voucherReturn','_cooldownMult','_diagCooldownMult','_fixStaminaMult','_fameBonusPerFix','_vipFameBonus','_partsDiscount','_restockCost','_helperAutoRestock','_helperSpeedMult','_helperDiagSpeed','_playerRepairSpeedMult'];
 function restoreArray(target, base){
  target.length=0;
  base.forEach(v=>target.push({...v, ...(v.forProblems?{forProblems:[...v.forProblems]}:{})}));
@@ -2156,6 +2185,16 @@ function getActiveBayCount() {
  }
  return Math.min(active, bays.length);
 }
+function resolveChainProblems(car){
+ if(!car||diagnosticLevel<3)return [];
+ if(Array.isArray(car.chainProblems)&&car._chainResolved)return car.chainProblems;
+ const pool=Array.isArray(car.problem?.chainProbs)?car.problem.chainProbs:[];
+ const chance=window._chainChance||0.5;
+ car.chainProblems=pool.filter(()=>Math.random()<chance);
+ car._chainResolved=true;
+ maxChainFound=Math.max(maxChainFound,car.chainProblems.length);
+ return car.chainProblems;
+}
 function spawnCar(){
  const activeBayCount = getActiveBayCount();
  const freeBay=bays.slice(0, activeBayCount).find(b=>!b.car);if(!freeBay)return;
@@ -2242,9 +2281,10 @@ function hasRepairParts(car,showError=true){
  const prob=car.problem;
  const partNeeded=getProblemPart(prob);
  const actualNeeds=Math.max(1,car.needsParts-(window._partsDiscount||0));
- if(partNeeded && upgradesList.find(u=>u.id==='shop1')?.bought){
+ if(partNeeded && isPartsShopUnlocked()){
   const have=partInventory[partNeeded.id]||0;
   if(have<actualNeeds){if(showError){SFX.error();showToast(`Precisa de ${actualNeeds}x ${partNeeded.emoji} ${partNeeded.name}! Compre na loja.`);}return false;}
+  if(parts<1){if(showError){SFX.error();showToast('Precisa de 1 📦 consumível geral para finalizar o serviço.');}return false;}
  } else if(parts<actualNeeds){
   if(showError){SFX.error();showToast(`Peças insuficientes! Precisa de ${actualNeeds} 📦`);}return false;
  }
@@ -2273,7 +2313,7 @@ function performFixAtCar(car,bay){
  SFX.repair(car.problem.name,repairStage);
  spawnRepairFx(car,player);
  const _nightBonus=(window._nightSpeedBonus&&(Math.floor(gameMinute/60)%24>=20||Math.floor(gameMinute/60)%24<8))?window._nightSpeedBonus:1;
- car.workProgress+=20*_nightBonus;
+ car.workProgress+=20*_nightBonus*(window._playerRepairSpeedMult||1);
  if(car.workProgress>=car.maxWork){completeFix(car,bay);}
  else{showToast(`${car.problem.emoji} Progresso: ${Math.floor(car.workProgress/car.maxWork*100)}%`);}
 }
@@ -2283,8 +2323,9 @@ function completeFix(car,bay){
  const prob=car.problem;
  const partNeeded=getProblemPart(prob);
  const actualNeeds=Math.max(1,car.needsParts-(window._partsDiscount||0));
- if(partNeeded && upgradesList.find(u=>u.id==="shop1")?.bought){
+ if(partNeeded && isPartsShopUnlocked()){
    partInventory[partNeeded.id]=Math.max(0,(partInventory[partNeeded.id]||0)-actualNeeds);
+   parts=Math.max(0,parts-1);
  } else {
    parts=Math.max(0,parts-actualNeeds);
  }
@@ -2300,13 +2341,11 @@ function completeFix(car,bay){
  const rm=car.personality?car.personality.repMult:1;
  const rep=Math.round(calcRepGain(car.problem,car.vtype)*rm);
  let chainBonus=0;
- if(diagnosticLevel>=3&&car.problem.chainProbs&&car.problem.chainProbs.length>0){
- const chainChance=window._chainChance||0.5;
- const found=car.problem.chainProbs.filter(()=>Math.random()<chainChance);
+ if(diagnosticLevel>=3){
+ const found=Array.isArray(car.chainProblems)?car.chainProblems:[];
  if(found.length>0){
  const chainVal=30*(window._chainValueMult||1);
  chainBonus=found.length*chainVal;
- maxChainFound=Math.max(maxChainFound,found.length);
  spawnFloatText(car.x+car.w/2,car.y-45,`💥 +${found.length} falha(s)! +$${chainBonus}`,"#fb923c");
  }
  }
@@ -2349,9 +2388,11 @@ function performDiagnoseAtCar(car,bay){
   showToast(`🔗 Inspeção: risco de falha em cadeia (${car.problem.chainProbs.length})`);
  }
  if(diagnosticLevel>=3&&car.problem.chainProbs?.length>0){
-  const chains=car.problem.chainProbs;
-  showToast(`💥 Falhas em cadeia detectadas: ${chains.join(', ')}!`);
-  spawnFloatText(car.x+car.w/2,car.y-30,`⚠️ +${chains.length} falha(s)!`,'#fb923c');
+  const chains=resolveChainProblems(car);
+  if(chains.length){
+   showToast(`💥 Falhas em cadeia detectadas: ${chains.join(', ')}!`);
+   spawnFloatText(car.x+car.w/2,car.y-30,`⚠️ +${chains.length} falha(s)!`,'#fb923c');
+  } else showToast('✅ Scanner Pro: nenhuma falha em cadeia confirmada.');
  }
 }
 function doRestock(){
@@ -2388,8 +2429,8 @@ function renderFoodMenu(){
  body.innerHTML=foodItems.map((item,i)=>`<button class="food-choice" onclick="buyFoodFromMenu(${i})"><span>${item.name}</span><small>+${item.hunger} fome${item.stamina||item.staminaBonus?` · +${item.stamina||item.staminaBonus}⚡`:''}</small><b>$${item.cost}</b></button>`).join('');
  const bal=document.getElementById('cantine-balance');if(bal)bal.textContent='$'+money;
 }
-function openFoodMenu(){if(!nearCantine()){showToast('Vá até a Cantina! 🍔');return;}renderFoodMenu();const m=document.getElementById('cantine-menu-modal');if(m)m.style.display='flex';}
-function closeFoodMenu(){const m=document.getElementById('cantine-menu-modal');if(m)m.style.display='none';}
+function openFoodMenu(){if(!nearCantine()){showToast('Vá até a Cantina! 🍔');return;}renderFoodMenu();OverlayManager.open('cantine-menu-modal');const m=document.getElementById('cantine-menu-modal');if(m)m.style.display='flex';}
+function closeFoodMenu(){OverlayManager.close('cantine-menu-modal');const m=document.getElementById('cantine-menu-modal');if(m)m.style.display='none';}
 function buyFoodFromMenu(i){if(doEat(i)){renderFoodMenu();}}
 window.openFoodMenu=openFoodMenu;window.closeFoodMenu=closeFoodMenu;window.buyFoodFromMenu=buyFoodFromMenu;
 window.openPartsShop=openPartsShop;
