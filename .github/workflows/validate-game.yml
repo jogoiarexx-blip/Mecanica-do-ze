@@ -1,0 +1,42 @@
+name: Validate game
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: JavaScript syntax
+        run: |
+          node --check js/game.js
+          node --check js/mobile-controls.js
+          node --check js/pwa.js
+          node --check sw.js
+      - name: Structure and manifest
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json,re
+          root=Path('.')
+          json.load(open('manifest.json',encoding='utf-8'))
+          html=Path('index.html').read_text(encoding='utf-8')
+          refs=re.findall(r'(?:src|href)=["\']([^"\']+)',html)
+          missing=[]
+          for ref in refs:
+              if ref.startswith(('http://','https://','#','data:','mailto:','javascript:')): continue
+              ref=ref.split('?',1)[0]
+              if ref and not (root/ref).exists(): missing.append(ref)
+          assert not missing, f'Missing refs: {missing}'
+          js=Path('js/game.js').read_text(encoding='utf-8')
+          assert 'function drawRepairVehicleVisuals' in js
+          assert js.count('drawRepairVehicleVisuals(car,bx,by,cw,ch);') >= 5
+          assert 'mecanica-ze-v9' in Path('sw.js').read_text(encoding='utf-8')
+          print('OK: structure, manifest, repair visuals, PWA cache')
+          PY
