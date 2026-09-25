@@ -1,4 +1,4 @@
-# Mecânica do Zé v3.0.0 — Correções PC + Celular
+# Mecânica do Zé v3.0.1 — Correções PC + Celular
 
 Esta versão parte da v2.2 original e mantém o conteúdo do jogo, mas reorganiza o projeto em CSS/JS separados.
 
@@ -129,3 +129,11 @@ Estrutura:
 - PWA atualizado para cache v12.
 
 - CI de regressão ampliado para Save v5, módulos, DPR, mobile e PWA.
+
+
+## v3.0.1 — correção das abas de upgrades
+- clicar novamente em OFICINA, NEGÓCIO ou EQUIPE agora fecha o painel;
+- ao fechar, a aba deixa de permanecer marcada como ativa;
+- clicar em outra aba troca normalmente o conteúdo e mantém o painel aberto;
+- adicionados estados aria-expanded nos botões;
+- PWA atualizado para cache v13.
