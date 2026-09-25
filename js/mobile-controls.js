@@ -15,7 +15,7 @@
    if(currentGameState!==GAME_STATE.PLAYING)return;
    if(name==='fix')doFix();
    else if(name==='diag'){nearShop()?openPartsShop():doDiagnose();}
-   else if(name==='shop'){if(nearCantine())doEat(0);else if(nearShop())openPartsShop();else if(!hasCantine&&nearCantineArea())buyCantineInWorld();else doDiagnose();}
+   else if(name==='shop'){if(nearCantine())openFoodMenu();else if(nearShop())openPartsShop();else if(!hasCantine&&nearCantineArea())buyCantineInWorld();else doDiagnose();}
    else if(name==='rest')doRestock();
  }
  document.querySelectorAll('.mob-btn').forEach(btn=>{const map={'btn-fix':'fix','btn-diag':'diag','btn-shop':'shop','btn-rest':'rest'};const name=map[btn.id];btn.addEventListener('pointerdown',e=>{e.preventDefault();btn.classList.add('pressed');SFX?._init?.();action(name);});['pointerup','pointercancel','pointerleave'].forEach(t=>btn.addEventListener(t,()=>btn.classList.remove('pressed')));});
