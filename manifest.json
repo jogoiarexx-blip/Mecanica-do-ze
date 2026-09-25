@@ -1,7 +1,7 @@
 {
   "name": "Mecânica do Zé",
   "short_name": "Mecânica Zé",
-  "description": "Mecânica do Zé v2.9.0 — simulador de oficina otimizado para PC e celular.",
+  "description": "Mecânica do Zé v3.0.0 — simulador de oficina otimizado para PC e celular.",
   "start_url": "./index.html",
   "display": "fullscreen",
   "orientation": "landscape",
