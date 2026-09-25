@@ -1,4 +1,4 @@
-# Mecânica do Zé v2.5.0 — Correções PC + Celular
+# Mecânica do Zé v2.6.0 — Correções PC + Celular
 
 Esta versão parte da v2.2 original e mantém o conteúdo do jogo, mas reorganiza o projeto em CSS/JS separados.
 
@@ -64,3 +64,17 @@ Estrutura:
 - ações usam animação curta sem alterar hitbox, velocidade ou regras de economia;
 - fallback procedural e sprites direcionais anteriores continuam ativos;
 - PWA atualizado para cache v7 incluindo o novo asset.
+
+
+## v2.6.0 — pontos de trabalho por defeito
+- Zé caminha automaticamente até o ponto correto do veículo ao diagnosticar ou consertar;
+- controles ficam temporariamente travados durante aproximação e animação de serviço;
+- Motor, Óleo, Bateria, Elétrica, Correia, Radiador e Superaquecimento usam a região dianteira;
+- Pneu, Freio e Aquaplanagem usam a roda/lateral mais próxima;
+- Transmissão usa a parte traseira;
+- Farol usa o canto dianteiro mais próximo;
+- sprite vira automaticamente para o carro;
+- cada defeito usa a ferramenta visual adequada (chave, scanner, pneu ou caixa);
+- ajudante também se posiciona no ponto exato e fica orientado para o veículo;
+- hitboxes, custos, peças e progresso de reparo permanecem iguais à v2.5.0;
+- PWA atualizado para cache v8.
