@@ -1442,6 +1442,15 @@ const CHARACTER_SPRITES = (() => {
   helper:makeAsset("./assets/sprites/ajudante.png")
  };
 })();
+const CANTINA_SPRITE=(()=>{
+ const image=new Image();
+ const asset={image,ready:false,failed:false};
+ image.decoding="async";
+ image.onload=()=>{asset.ready=true;};
+ image.onerror=()=>{asset.failed=true;console.warn("[sprites] Falha ao carregar a cantina; usando fallback procedural.");};
+ image.src=window.CANTINA_SPRITE_SRC||"";
+ return asset;
+})();
 let playerAction=null, playerActionTimer=0;
 let playerWorkTask=null;
 function setPlayerAction(type,ticks=30){ playerAction=type; playerActionTimer=Math.max(playerActionTimer,ticks); }
@@ -1857,7 +1866,7 @@ const shelf={x:700,y:720,w:180,h:65};
 const waitArea={x:100,y:1020,w:1300,h:70};
 const desk={x:1350,y:680,w:110,h:90};
 const partsShopArea={x:950,y:720,w:200,h:80}; 
-const cantineArea={x:400,y:840,w:160,h:80}; 
+const cantineArea={x:380,y:815,w:200,h:175}; 
 let spawnTimer=0,spawnDelay=1800;
 const upgradesList=[
  {section:"🔧 FERRAMENTAS"},
@@ -2795,6 +2804,26 @@ function drawCantineArea(){
  }
  const isNear=nearCantine();
  const pulse=isNear?0.85+0.15*Math.sin(tick*0.14):0.6;
+ if(CANTINA_SPRITE.ready&&!CANTINA_SPRITE.failed){
+   ctx.save();
+   ctx.imageSmoothingEnabled=false;
+   ctx.fillStyle="rgba(0,0,0,0.28)";
+   ctx.beginPath();ctx.ellipse(cx+cw/2,cy+ch-4,cw*0.42,10,0,0,Math.PI*2);ctx.fill();
+   ctx.drawImage(CANTINA_SPRITE.image,Math.round(cx),Math.round(cy),cw,ch);
+   if(isNear){
+     ctx.strokeStyle=`rgba(251,191,36,${pulse})`;ctx.lineWidth=2.5;ctx.strokeRect(cx-2,cy-2,cw+4,ch+4);
+     ctx.globalAlpha=0.10*pulse;ctx.fillStyle="#fbbf24";ctx.fillRect(cx-4,cy-4,cw+8,ch+8);ctx.globalAlpha=1;
+   }
+   ctx.restore();
+   if(isNear){
+     ctx.textAlign="center";ctx.font="10px 'VT323'";
+     ctx.fillStyle="rgba(255,255,255,0.90)";ctx.fillText("[E] Abrir Cantina / 1-5 Comer",cx+cw/2,cy+ch+13);
+     const hungerPct=Math.round(hunger/maxHunger*100);
+     ctx.fillStyle=hunger>50?"#84cc16":hunger>25?"#fbbf24":"#ef4444";
+     ctx.fillText("🍔 Fome: "+hungerPct+"%",cx+cw/2,cy-8);
+   }
+   return;
+ }
  ctx.fillStyle="rgba(0,0,0,0.4)";ctx.fillRect(cx+4,cy+4,cw,ch);
  const bg=ctx.createLinearGradient(cx,cy,cx,cy+ch);
  bg.addColorStop(0,"#3d2208");bg.addColorStop(0.5,"#2a1505");bg.addColorStop(1,"#1a0d03");
