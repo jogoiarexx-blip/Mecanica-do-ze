@@ -15,11 +15,13 @@ jobs:
           node-version: '22'
       - name: JavaScript syntax
         run: |
+          node --check js/game-config.js
           node --check js/game.js
+          node --check js/repair-systems.js
           node --check js/mobile-controls.js
           node --check js/pwa.js
           node --check sw.js
-      - name: Structure and manifest
+      - name: Structure and regression guards
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -34,12 +36,25 @@ jobs:
               ref=ref.split('?',1)[0]
               if ref and not (root/ref).exists(): missing.append(ref)
           assert not missing, f'Missing refs: {missing}'
+          ids=re.findall(r'id="([^"]+)"',html)
+          dup=sorted({x for x in ids if ids.count(x)>1})
+          assert not dup, f'Duplicate IDs: {dup}'
           js=Path('js/game.js').read_text(encoding='utf-8')
-          assert 'function drawRepairVehicleVisuals' in js
-          assert 'DESMONTANDO' in js and 'INSTALANDO' in js and 'AJUSTE FINAL' in js
-          assert 'function repair(problemName, stage=1)' in js
-          assert 'SFX.repair(car.problem.name,repairStage)' in js
-          assert js.count('drawRepairVehicleVisuals(car,bx,by,cw,ch);') >= 5
-          assert 'mecanica-ze-v11' in Path('sw.js').read_text(encoding='utf-8')
-          print('OK: structure, manifest, repair visuals, PWA cache')
+          repair=Path('js/repair-systems.js').read_text(encoding='utf-8')
+          config=Path('js/game-config.js').read_text(encoding='utf-8')
+          sw=Path('sw.js').read_text(encoding='utf-8')
+          assert 'SAVE_VERSION: 5' in config
+          assert 'devicePixelRatio' in js
+          assert 'moveMag=Math.hypot(dx,dy)' in js
+          assert 'difficulty: currentDifficulty' in js
+          assert 'brokeDay: _brokeDay' in js
+          assert 'function getProblemPart(problem)' in js
+          assert 'openFoodMenu()' in Path('js/mobile-controls.js').read_text(encoding='utf-8')
+          assert 'function drawRepairVehicleVisuals' in repair
+          assert 'DESMONTANDO' in repair and 'INSTALANDO' in repair and 'AJUSTE FINAL' in repair
+          assert 'mecanica-ze-v12' in sw
+          assert './js/game-config.js' in sw and './js/repair-systems.js' in sw
+          assert "localStorage.setItem('mecanicaze_ach_v3'" not in js
+          assert '}, 16);' not in js
+          print('OK: syntax, structure and v3 regression guards')
           PY
