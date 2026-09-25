@@ -1126,7 +1126,7 @@ window.checkAchievements= checkAchievements;
  const sv = +(localStorage.getItem('mecanicaze_sfx_volume') ?? 80);
  const av = +(localStorage.getItem('mecanicaze_ambient_volume') ?? 50);
  setTimeout(() => { setMasterVolume(mv); setSfxVolume(sv); setAmbientVolume(av); setMuteAll(localStorage.getItem('mecanicaze_muted')==='1'); }, 0);
- if(typeof loadAchievementsFromStorage === "function")})();
+})();
 const HELPER_STATES = {
  IDLE: 'idle',
  MOVING: 'moving',
