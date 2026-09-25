@@ -774,7 +774,7 @@ const SaveSystem = (() => {
  if (d.player) { player.x = d.player.x; player.y = d.player.y; }
  if (typeof BillsSystem !== 'undefined' && BillsSystem.reset) BillsSystem.reset();
  if (d.bills && typeof BillsSystem !== 'undefined') BillsSystem.applySaveData(d.bills);
- actionCooldown = 0; fixingCar = null; fixTimer = 0; playerAction = null; playerActionTimer = 0;
+ actionCooldown = 0; fixingCar = null; fixTimer = 0; playerAction = null; playerActionTimer = 0; playerWorkTask = null;
  if (WeatherSystem.isRainy()) WeatherSystem.spawnRain(); else rainDrops = [];
  _wasOpen = isOpen();
  }
@@ -1170,8 +1170,11 @@ function updateHelperAI(h) {
  } else if (h.state === HELPER_STATES.MOVING) {
  var car = h.targetCar;
  if (!car || car.fixed || car.patience <= 0) { h.state = HELPER_STATES.IDLE; h.targetCar = null; return; }
- var arrived = helperMoveToward(h, car.x + car.w/2 - 11, car.y + car.h/2, 2.5);
- if (arrived || helperNearTarget(h, car.x + car.w/2, car.y + car.h/2, 85)) {
+ const helperMode=car.diagnosed?'fix':'diagnose';
+ const hspot=getCarWorkSpot(car,helperMode,h);
+ var arrived = helperMoveToward(h,hspot.x,hspot.y,2.5);
+ if (arrived || helperNearTarget(h,hspot.x,hspot.y,8)) {
+ h.x=hspot.x;h.y=hspot.y;h.dir=hspot.dir;
  h.state = car.diagnosed ? HELPER_STATES.FIXING : HELPER_STATES.DIAGNOSING;
  h.stateTimer = 0;
  }
@@ -1179,6 +1182,7 @@ function updateHelperAI(h) {
  } else if (h.state === HELPER_STATES.DIAGNOSING) {
  var car = h.targetCar;
  if (!car || car.fixed || car.patience <= 0) { h.state = HELPER_STATES.IDLE; h.targetCar = null; return; }
+ const dspot=getCarWorkSpot(car,'diagnose',h);h.x=dspot.x;h.y=dspot.y;h.dir=dspot.dir;
  h.frame = Math.floor(h.stateTimer / 8) % 4;
  if (h.stateTimer === 18) {
  SFX.diagnose();
@@ -1215,6 +1219,7 @@ function updateHelperAI(h) {
  h.stateTimer = 0;
  return;
  }
+ const fspot=getCarWorkSpot(car,'fix',h);h.x=fspot.x;h.y=fspot.y;h.dir=fspot.dir;
  h.frame = Math.floor(h.stateTimer / 6) % 4;
  if (h.stateTimer % 10 === 0) {
  SFX.wrench();
@@ -1351,7 +1356,90 @@ const CHARACTER_SPRITES = (() => {
  };
 })();
 let playerAction=null, playerActionTimer=0;
+let playerWorkTask=null;
 function setPlayerAction(type,ticks=30){ playerAction=type; playerActionTimer=Math.max(playerActionTimer,ticks); }
+const REPAIR_WORK_PROFILES={
+ 'Motor':{zone:'front',action:'fix'},
+ 'Freio':{zone:'wheel',action:'fix'},
+ 'Pneu':{zone:'wheel',action:'carry'},
+ 'Elétrica':{zone:'front',action:'diagnose'},
+ 'Óleo':{zone:'front',action:'toolbox'},
+ 'Transmissão':{zone:'rear',action:'fix'},
+ 'Bateria':{zone:'front',action:'diagnose'},
+ 'Superaquecimento':{zone:'front',action:'toolbox'},
+ 'Aquaplanagem':{zone:'wheel',action:'carry'},
+ 'Correia':{zone:'front',action:'fix'},
+ 'Farol':{zone:'frontCorner',action:'diagnose'},
+ 'Radiador':{zone:'front',action:'toolbox'}
+};
+function getRepairWorkProfile(car,mode='fix'){
+ const base=REPAIR_WORK_PROFILES[car?.problem?.name]||{zone:'front',action:'fix'};
+ return mode==='diagnose'?{...base,action:'diagnose'}:base;
+}
+function getCarWorkSpot(car,mode='fix',actor=player){
+ const profile=getRepairWorkProfile(car,mode);
+ const aw=actor.w||22, ah=actor.h||32;
+ const actorCx=(actor.x||0)+aw/2;
+ let x=car.x+car.w/2-aw/2, y=car.y+car.h+10, dir='up';
+ if(profile.zone==='rear'){
+  x=car.x+car.w/2-aw/2; y=car.y-ah-10; dir='down';
+ } else if(profile.zone==='wheel'){
+  const left=actorCx < car.x+car.w/2;
+  x=left?car.x-aw-9:car.x+car.w+9;
+  y=car.y+car.h*0.66-ah/2; dir=left?'right':'left';
+ } else if(profile.zone==='frontCorner'){
+  const left=actorCx < car.x+car.w/2;
+  x=left?car.x-aw-7:car.x+car.w+7;
+  y=car.y+car.h*0.78-ah/2; dir=left?'right':'left';
+ }
+ x=Math.max(8,Math.min(shopW-aw-8,x));
+ y=Math.max(18,Math.min(shopH-ah-8,y));
+ return {x,y,dir,profile};
+}
+function getRepairEffectPoint(car,mode='fix',actor=player){
+ const spot=getCarWorkSpot(car,mode,actor);
+ const profile=spot.profile;
+ if(profile.zone==='wheel'){
+  const left=spot.dir==='right';
+  return {x:left?car.x+4:car.x+car.w-4,y:car.y+car.h*0.70};
+ }
+ if(profile.zone==='rear') return {x:car.x+car.w/2,y:car.y+car.h*0.16};
+ if(profile.zone==='frontCorner') return {x:spot.dir==='right'?car.x+car.w*0.12:car.x+car.w*0.88,y:car.y+car.h*0.80};
+ return {x:car.x+car.w/2,y:car.y+car.h*0.80};
+}
+function beginPlayerWork(car,bay,mode){
+ if(!car||car.fixed)return false;
+ const spot=getCarWorkSpot(car,mode,player);
+ playerWorkTask={car,bay,mode,phase:'approach',spot};
+ return true;
+}
+function cancelPlayerWork(){ playerWorkTask=null; playerAction=null; playerActionTimer=0; }
+function updatePlayerWorkTask(){
+ const task=playerWorkTask;
+ if(!task)return false;
+ const car=task.car;
+ if(!car){cancelPlayerWork();return false;}
+ if(task.phase==='approach'&&(car.fixed||!cars.includes(car)||car.patience<=0)){cancelPlayerWork();return false;}
+ if(task.phase==='working'){
+  player.x=task.spot.x; player.y=task.spot.y; player.dir=task.spot.dir; moving=false;
+  return true;
+ }
+ const dx=task.spot.x-player.x, dy=task.spot.y-player.y;
+ const dist=Math.hypot(dx,dy);
+ if(dist<=3){
+  player.x=task.spot.x; player.y=task.spot.y; player.dir=task.spot.dir; moving=false;
+  task.phase='working';
+  if(task.mode==='diagnose')performDiagnoseAtCar(task.car,task.bay); else performFixAtCar(task.car,task.bay);
+  return true;
+ }
+ const spd=Math.max(3.2,playerSpeed*1.15);
+ player.x+=dx/dist*Math.min(spd,dist);
+ player.y+=dy/dist*Math.min(spd,dist);
+ if(Math.abs(dx)>Math.abs(dy))player.dir=dx>0?'right':'left'; else player.dir=dy>0?'down':'up';
+ player.frameTimer++;if(player.frameTimer>6){player.frame=(player.frame+1)%4;player.frameTimer=0;}
+ moving=true;
+ return true;
+}
 function drawActionProp(entity, action, kind, cx, footY, drawW, drawH){
  const sheet=CHARACTER_SPRITES.props;
  if(!action || !sheet.ready || sheet.failed) return;
@@ -2096,35 +2184,41 @@ function buyCantineInWorld(){
 }
 let actionCooldown=0;
 let fixingCar=null,fixTimer=0;
-function doFix(){
- if(actionCooldown>0||stamina<5)return;
- const bay=nearBay();
- if(!bay||!bay.car){SFX.error();showToast("Nenhum carro aqui! 🚗");return;}
- const car=bay.car;
- if(!car.diagnosed){SFX.error();showToast("Diagnostique primeiro! 🔍");return;}
- if(car.fixed){SFX.error();showToast("Já consertado! ✅");return;}
+function hasRepairParts(car,showError=true){
  const prob=car.problem;
  const partNeeded=PART_TYPES.find(pt=>pt.forProblems.includes(prob.name));
- if(partNeeded && upgradesList.find(u=>u.id==="shop1")?.bought){
- const have=partInventory[partNeeded.id]||0;
- const _actualNeeds=Math.max(1,car.needsParts-(window._partsDiscount||0));
- if(have<_actualNeeds){
- SFX.error();
- showToast(`Precisa de ${car.needsParts}x ${partNeeded.emoji} ${partNeeded.name}! Compre na loja.`);
- return;
+ const actualNeeds=Math.max(1,car.needsParts-(window._partsDiscount||0));
+ if(partNeeded && upgradesList.find(u=>u.id==='shop1')?.bought){
+  const have=partInventory[partNeeded.id]||0;
+  if(have<actualNeeds){if(showError){SFX.error();showToast(`Precisa de ${actualNeeds}x ${partNeeded.emoji} ${partNeeded.name}! Compre na loja.`);}return false;}
+ } else if(parts<actualNeeds){
+  if(showError){SFX.error();showToast(`Peças insuficientes! Precisa de ${actualNeeds} 📦`);}return false;
  }
- } else {
- const _gNeeds=Math.max(1,car.needsParts-(window._partsDiscount||0));
- if(parts<_gNeeds){SFX.error();showToast(`Peças insuficientes! Precisa de ${_gNeeds} 📦`);return;}
- }
+ return true;
+}
+function doFix(){
+ if(playerWorkTask||actionCooldown>0||stamina<5)return;
+ const bay=nearBay();
+ if(!bay||!bay.car){SFX.error();showToast('Nenhum carro aqui! 🚗');return;}
+ const car=bay.car;
+ if(!car.diagnosed){SFX.error();showToast('Diagnostique primeiro! 🔍');return;}
+ if(car.fixed){SFX.error();showToast('Já consertado! ✅');return;}
+ if(!hasRepairParts(car,true))return;
+ beginPlayerWork(car,bay,'fix');
+}
+function performFixAtCar(car,bay){
+ if(!car||car.fixed||bay?.car!==car){cancelPlayerWork();return;}
+ if(!hasRepairParts(car,true)){cancelPlayerWork();return;}
  fixingCar=car;fixTimer=0;
- setPlayerAction('fix',28);
+ const profile=getRepairWorkProfile(car,'fix');
+ setPlayerAction(profile.action,34);
  stamina=Math.max(0,stamina-12*(window._fixStaminaMult||1));
  hunger=Math.max(0,hunger-3);
  actionCooldown=Math.floor(20*(window._cooldownMult||1));
  SFX.wrench();
- spawnParticles(car.x+car.w/2,car.y+car.h/2,"#fbbf24",8);
- spawnFloatText(car.x+car.w/2,car.y,"🔧 Consertando..","#fbbf24");
+ const fx=getRepairEffectPoint(car,'fix',player);
+ spawnParticles(fx.x,fx.y,'#fbbf24',8);
+ spawnFloatText(fx.x,fx.y-8,`${car.problem.emoji} ${car.problem.name}`,'#fbbf24');
  const _nightBonus=(window._nightSpeedBonus&&(Math.floor(gameMinute/60)%24>=20||Math.floor(gameMinute/60)%24<8))?window._nightSpeedBonus:1;
  car.workProgress+=20*_nightBonus;
  if(car.workProgress>=car.maxWork){completeFix(car,bay);}
@@ -2183,24 +2277,29 @@ function completeFix(car,bay){
  setTimeout(()=>{const i=cars.indexOf(car);if(i>-1)cars.splice(i,1);},100);
 }
 function doDiagnose(){
- if(actionCooldown>0)return;
+ if(playerWorkTask||actionCooldown>0)return;
  const bay=nearBay();
- if(!bay||!bay.car){showToast("Nenhum carro perto! 🚗");return;}
+ if(!bay||!bay.car){showToast('Nenhum carro perto! 🚗');return;}
  const car=bay.car;
  if(car.diagnosed){showToast(`Já diagnosticado: ${car.problem.emoji} ${car.problem.name}`);return;}
+ beginPlayerWork(car,bay,'diagnose');
+}
+function performDiagnoseAtCar(car,bay){
+ if(!car||car.fixed||bay?.car!==car){cancelPlayerWork();return;}
  car.diagnosed=true;actionCooldown=Math.floor(30*(window._diagCooldownMult||1));
- setPlayerAction('diagnose',34);
+ setPlayerAction('diagnose',38);
  SFX.diagnose();
- spawnFloatText(car.x+car.w/2,car.y,`🔍 ${car.problem.emoji} ${car.problem.name}`,"#60a5fa");
+ const fx=getRepairEffectPoint(car,'diagnose',player);
+ spawnFloatText(fx.x,fx.y-8,`🔍 ${car.problem.emoji} ${car.problem.name}`,'#60a5fa');
  showToast(`Problema: ${car.problem.emoji} ${car.problem.name} — Peças: ${car.problem.parts}`);
  if(diagnosticLevel>=2){showToast(`Custo estimado: $${car.problem.base} 💰`);}
  if(window._chainHint && diagnosticLevel<3 && car.problem.chainProbs?.length>0){
- showToast(`🔗 Inspeção: risco de falha em cadeia (${car.problem.chainProbs.length})`);
+  showToast(`🔗 Inspeção: risco de falha em cadeia (${car.problem.chainProbs.length})`);
  }
  if(diagnosticLevel>=3&&car.problem.chainProbs?.length>0){
- const chains=car.problem.chainProbs;
- showToast(`💥 Falhas em cadeia detectadas: ${chains.join(", ")}!`);
- spawnFloatText(car.x+car.w/2,car.y-30,`⚠️ +${chains.length} falha(s)!`,"#fb923c");
+  const chains=car.problem.chainProbs;
+  showToast(`💥 Falhas em cadeia detectadas: ${chains.join(', ')}!`);
+  spawnFloatText(car.x+car.w/2,car.y-30,`⚠️ +${chains.length} falha(s)!`,'#fb923c');
  }
 }
 function doRestock(){
@@ -3186,7 +3285,7 @@ function drawHelpers(){
  helpers.forEach(h=>{
  const helperActive = h.state !== HELPER_STATES.IDLE || !!h.patrolTarget;
  let helperAction=null;
- if(h.state===HELPER_STATES.FIXING) helperAction='fix';
+ if(h.state===HELPER_STATES.FIXING) helperAction=getRepairWorkProfile(h.targetCar,'fix').action;
  else if(h.state===HELPER_STATES.DIAGNOSING) helperAction='diagnose';
  else if(h.state===HELPER_STATES.RESTOCKING) helperAction='carry';
  if(!drawCharacterSprite(h,"helper",helperActive,helperAction)) drawPerson(h.x,h.y,h.w,h.h,"#fdbcb4","#3b82f6",h.dir,h.frame,true);
@@ -3272,25 +3371,31 @@ function update(){
  if(tick%4===0){gameMinute++;if(gameMinute>=24*60)gameMinute=0;}
  if(tick%60===0)updateDayNight();
  updateWeather();
+ const workLocked=updatePlayerWorkTask();
  let dx=0,dy=0;
- if(keys["w"]||keys["arrowup"])dy=-1;
- if(keys["s"]||keys["arrowdown"])dy=1;
- if(keys["a"]||keys["arrowleft"])dx=-1;
- if(keys["d"]||keys["arrowright"]){if(!keys["arrowleft"])dx=1;}
- if(joyDX||joyDY){dx=joyDX;dy=joyDY;}
- moving=dx!==0||dy!==0;
- if(moving){
- const spd=playerSpeed*(stamina>0?1:0.4)*(hunger>20?1:0.7);
- player.x=Math.max(10,Math.min(shopW-player.w-10,player.x+dx*spd));
- player.y=Math.max(25,Math.min(shopH-player.h-10,player.y+dy*spd));
- if(dx>0)player.dir="right";else if(dx<0)player.dir="left";else if(dy>0)player.dir="down";else player.dir="up";
- player.frameTimer++;if(player.frameTimer>8){player.frame=(player.frame+1)%4;player.frameTimer=0;}
- stamina=Math.max(0,stamina-staminaDrain);
- hunger=Math.max(0,hunger-hungerDrain);
- if(tick%18===0)SFX.footstep();
- } else {
- stamina=Math.min(maxStamina,stamina+staminaRegen);
- hunger=Math.max(0,hunger-hungerDrain*0.3);
+ if(!workLocked){
+  if(keys["w"]||keys["arrowup"])dy=-1;
+  if(keys["s"]||keys["arrowdown"])dy=1;
+  if(keys["a"]||keys["arrowleft"])dx=-1;
+  if(keys["d"]||keys["arrowright"]){if(!keys["arrowleft"])dx=1;}
+  if(joyDX||joyDY){dx=joyDX;dy=joyDY;}
+  moving=dx!==0||dy!==0;
+  if(moving){
+   const spd=playerSpeed*(stamina>0?1:0.4)*(hunger>20?1:0.7);
+   player.x=Math.max(10,Math.min(shopW-player.w-10,player.x+dx*spd));
+   player.y=Math.max(25,Math.min(shopH-player.h-10,player.y+dy*spd));
+   if(dx>0)player.dir="right";else if(dx<0)player.dir="left";else if(dy>0)player.dir="down";else player.dir="up";
+   player.frameTimer++;if(player.frameTimer>8){player.frame=(player.frame+1)%4;player.frameTimer=0;}
+   stamina=Math.max(0,stamina-staminaDrain);
+   hunger=Math.max(0,hunger-hungerDrain);
+   if(tick%18===0)SFX.footstep();
+  } else {
+   stamina=Math.min(maxStamina,stamina+staminaRegen);
+   hunger=Math.max(0,hunger-hungerDrain*0.3);
+  }
+ } else if(playerWorkTask?.phase==='approach'){
+  stamina=Math.min(maxStamina,stamina+staminaRegen*0.25);
+  hunger=Math.max(0,hunger-hungerDrain*0.15);
  }
  camera.x=Math.max(0,Math.min(shopW-canvas.width,player.x+player.w/2-canvas.width/2));
  camera.y=Math.max(0,Math.min(shopH-canvas.height,player.y+player.h/2-canvas.height/2));
@@ -3359,7 +3464,7 @@ function update(){
  for(let i=floatTexts.length-1;i>=0;i--){if(floatTexts[i].life<=0)floatTexts.splice(i,1);}
  if(stamina<maxStamina*0.2&&stamina>0&&tick%90===0)SFX.staminaWarn();
  if(actionCooldown>0)actionCooldown--;
- if(playerActionTimer>0){playerActionTimer--;if(playerActionTimer<=0){playerActionTimer=0;playerAction=null;}}
+ if(playerActionTimer>0){playerActionTimer--;if(playerActionTimer<=0){playerActionTimer=0;playerAction=null;if(playerWorkTask?.phase==='working')playerWorkTask=null;}}
  if(tick%120===0){updateHUD();checkMissions();renderUpgradePanel();checkAchievements();checkBankruptcy();checkBankruptcyRecovery();}
 }
 function draw(){
@@ -3504,7 +3609,7 @@ function resetGameState(){
  staminaDrain=0.05;staminaRegen=0.04;
  diagnosticLevel=1;toolQuality=1;reputationMult=1;
  gameMinute=8*60;tick=0;spawnDelay=1800;spawnTimer=0; weatherTimer=0;nextWeatherChange=1800;
- _lastTierIdx=0;_tierUpAnim=null; actionCooldown=0;fixingCar=null;fixTimer=0;playerAction=null;playerActionTimer=0;
+ _lastTierIdx=0;_tierUpAnim=null; actionCooldown=0;fixingCar=null;fixTimer=0;playerAction=null;playerActionTimer=0;playerWorkTask=null;
  cars.length=0;particles.length=0;floatTexts.length=0;helpers.length=0;speechBubbles.length=0;
  bays.forEach(b=>b.car=null);
  player.x=400;player.y=600;player.dir="down";player.frame=0;
