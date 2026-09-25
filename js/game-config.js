@@ -1,0 +1,7 @@
+window.MZ_CONFIG = Object.freeze({
+  VERSION: '3.0.0',
+  SAVE_VERSION: 5,
+  BASE_HUNGER_DRAIN: 0.008,
+  WORKDAY_HUNGRY_TICKS: 12 * 60 * 4,
+  MAX_DPR: 2
+});
