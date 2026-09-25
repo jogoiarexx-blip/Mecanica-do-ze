@@ -2838,6 +2838,7 @@ function drawCar(car){
  if(isWorking&&tick%3===0){
  spawnParticles(bx+cw*0.15-(camera.x-camera.x),by+ch*0.9-(camera.y-camera.y),"rgba(80,80,80,0.5)",1);
  }
+ drawRepairVehicleVisuals(car,bx,by,cw,ch);
  drawCarBadges(car,bx,by,cw,ch);
 }
 function drawMoto(car){
@@ -2905,6 +2906,7 @@ function drawMoto(car){
  if(isWorking&&tick%4<3){
  spawnParticles(tx(car.x+car.w*0.05),ty(car.y+car.h*0.65),"rgba(120,120,120,0.4)",2);
  }
+ drawRepairVehicleVisuals(car,bx,by,cw,ch);
  drawCarBadges(car,bx,by,cw,ch);
 }
 function drawTruck(car){
@@ -2995,6 +2997,7 @@ function drawTruck(car){
  ctx.save();ctx.globalAlpha=0.16;
  ctx.fillStyle="#fff";ctx.beginPath();ctx.ellipse(bx+cw*0.68,by+ch*0.08,cw*0.09,ch*0.04,-0.3,0,Math.PI*2);ctx.fill();
  ctx.restore();
+ drawRepairVehicleVisuals(car,bx,by,cw,ch);
  drawCarBadges(car,bx,by,cw,ch);
 }
 function drawLuxury(car){
@@ -3090,6 +3093,7 @@ function drawLuxury(car){
  ctx.save();ctx.globalAlpha=0.22*shimmer;
  ctx.fillStyle="#fff";ctx.beginPath();ctx.ellipse(bx+cw*0.35,by+ch*0.22,cw*0.1,ch*0.05,-0.4,0,Math.PI*2);ctx.fill();
  ctx.restore();
+ drawRepairVehicleVisuals(car,bx,by,cw,ch);
  drawCarBadges(car,bx,by,cw,ch);
 }
 function drawBus(car){
@@ -3176,7 +3180,114 @@ function drawBus(car){
  ctx.fillStyle="#fff";ctx.beginPath();ctx.ellipse(bx+cw*0.3,by+ch*0.22,cw*0.12,ch*0.04,-0.2,0,Math.PI*2);ctx.fill();
  ctx.restore();
  if(isWorking&&tick%5<4){spawnParticles(bx+cw*0.95,by+ch*0.25,"rgba(100,100,100,0.4)",1);}
+ drawRepairVehicleVisuals(car,bx,by,cw,ch);
  drawCarBadges(car,bx,by,cw,ch);
+}
+function isCarActivelyWorked(car){
+ if(playerWorkTask?.car===car && (playerWorkTask.phase==='approach'||playerWorkTask.phase==='working')) return true;
+ return helpers.some(h=>h.targetCar===car&&(h.state===HELPER_STATES.MOVING||h.state===HELPER_STATES.DIAGNOSING||h.state===HELPER_STATES.FIXING));
+}
+function drawRepairVehicleVisuals(car,bx,by,cw,ch){
+ if(!car||car.fixed||!car.problem)return;
+ const active=isCarActivelyWorked(car);
+ const diagnosed=!!car.diagnosed;
+ const name=car.problem.name;
+ const pulse=0.55+0.45*Math.sin(tick*0.18);
+ const slow=0.55+0.45*Math.sin(tick*0.08);
+ ctx.save();
+ ctx.imageSmoothingEnabled=false;
+ if(diagnosed){
+   ctx.globalAlpha=0.28+0.18*slow;
+   ctx.strokeStyle=car.problem.color||'#f59e0b';
+   ctx.lineWidth=2;
+   ctx.setLineDash([5,4]);
+   ctx.strokeRect(bx+2,by+2,cw-4,ch-4);
+   ctx.setLineDash([]);
+ }
+ ctx.globalAlpha=1;
+ const frontY=by+ch*0.70;
+ const topY=by+ch*0.16;
+ const cx=bx+cw/2;
+ if(['Motor','Óleo','Bateria','Elétrica','Correia','Radiador','Superaquecimento'].includes(name)){
+   const hoodOpen=active?1:0.55;
+   ctx.save();
+   ctx.translate(cx,frontY);
+   ctx.rotate(-0.16*hoodOpen);
+   const hg=ctx.createLinearGradient(-cw*0.28,-ch*0.12,cw*0.28,ch*0.06);
+   hg.addColorStop(0,'rgba(30,30,30,0.95)');hg.addColorStop(1,'rgba(70,70,70,0.96)');
+   ctx.fillStyle=hg;ctx.fillRect(-cw*0.28,-ch*0.12,cw*0.56,ch*0.18);
+   ctx.strokeStyle='rgba(220,220,220,.35)';ctx.lineWidth=1;ctx.strokeRect(-cw*0.28,-ch*0.12,cw*0.56,ch*0.18);
+   ctx.restore();
+ }
+ if(name==='Motor'){
+   ctx.fillStyle='#222';ctx.fillRect(cx-cw*0.16,frontY-ch*0.08,cw*0.32,ch*0.13);
+   ctx.strokeStyle='#777';ctx.lineWidth=1;for(let i=0;i<3;i++){ctx.beginPath();ctx.moveTo(cx-cw*0.12+i*cw*0.12,frontY-ch*0.06);ctx.lineTo(cx-cw*0.12+i*cw*0.12,frontY+ch*0.03);ctx.stroke();}
+   if(active&&tick%5<3){ctx.fillStyle=`rgba(251,191,36,${0.55+0.35*pulse})`;ctx.font='12px sans-serif';ctx.textAlign='center';ctx.fillText('✦',cx+Math.sin(tick)*cw*0.12,frontY-ch*0.11);}
+ }
+ if(name==='Óleo'){
+   ctx.fillStyle='rgba(30,20,5,.82)';ctx.beginPath();ctx.ellipse(cx+cw*0.05,frontY+ch*0.16,cw*0.13,ch*0.055,0,0,Math.PI*2);ctx.fill();
+   if(active&&tick%12<6){ctx.fillStyle='#3b2f0b';ctx.beginPath();ctx.arc(cx+cw*0.08,frontY+ch*0.08,2+2*pulse,0,Math.PI*2);ctx.fill();}
+ }
+ if(name==='Bateria'){
+   const bx2=cx-cw*0.08,by2=frontY-ch*0.07;
+   ctx.fillStyle='#1f2937';ctx.fillRect(bx2,by2,cw*0.16,ch*0.10);
+   ctx.fillStyle='#ef4444';ctx.fillRect(bx2+2,by2+2,cw*0.035,ch*0.025);
+   ctx.fillStyle='#60a5fa';ctx.fillRect(bx2+cw*0.12,by2+2,cw*0.035,ch*0.025);
+   if(active){ctx.strokeStyle=`rgba(250,204,21,${.55+.4*pulse})`;ctx.lineWidth=2;ctx.strokeRect(bx2-2,by2-2,cw*0.16+4,ch*0.10+4);}
+ }
+ if(name==='Elétrica'){
+   if(active||diagnosed){
+    ctx.strokeStyle=`rgba(96,165,250,${.45+.45*pulse})`;ctx.lineWidth=2;
+    for(let i=0;i<2;i++){const x=cx+(-1+i*2)*cw*0.09;ctx.beginPath();ctx.moveTo(x,frontY-ch*0.05);ctx.lineTo(x+4,frontY-ch*0.11);ctx.lineTo(x-2,frontY-ch*0.14);ctx.stroke();}
+   }
+ }
+ if(name==='Correia'){
+   ctx.strokeStyle='#111';ctx.lineWidth=4;ctx.beginPath();ctx.ellipse(cx,frontY-ch*0.025,cw*0.12,ch*0.05,0,0,Math.PI*2);ctx.stroke();
+   if(active){ctx.strokeStyle=`rgba(251,191,36,${.4+.45*pulse})`;ctx.lineWidth=2;ctx.stroke();}
+ }
+ if(name==='Radiador'||name==='Superaquecimento'){
+   for(let i=0;i<(active?3:2);i++){
+     const sx=cx+(i-1)*cw*0.08+Math.sin(tick*0.08+i)*4;
+     const sy=frontY-ch*(0.13+i*0.015)-((tick+i*7)%18);
+     ctx.fillStyle=name==='Superaquecimento'?`rgba(220,220,220,${.18+.22*slow})`:`rgba(180,220,255,${.16+.18*slow})`;
+     ctx.beginPath();ctx.arc(sx,sy,5+i*1.5,0,Math.PI*2);ctx.fill();
+   }
+   if(name==='Superaquecimento'&&active){ctx.fillStyle=`rgba(239,68,68,${.35+.35*pulse})`;ctx.fillRect(cx-cw*0.18,frontY-ch*0.04,cw*0.36,ch*0.05);}
+ }
+ if(['Pneu','Freio','Aquaplanagem'].includes(name)){
+   const left=(playerWorkTask?.car===car?player.dir==='right':true);
+   const wx=left?bx+cw*0.09:bx+cw*0.91;
+   const wy=by+ch*0.76;
+   if(active){
+     ctx.fillStyle='rgba(18,18,18,.96)';ctx.beginPath();ctx.arc(wx,wy,cw*0.115,0,Math.PI*2);ctx.fill();
+     ctx.strokeStyle='#71717a';ctx.lineWidth=2;ctx.beginPath();ctx.arc(wx,wy,cw*0.07,0,Math.PI*2);ctx.stroke();
+     ctx.fillStyle='#b45309';ctx.fillRect(wx-cw*0.08,wy+ch*0.10,cw*0.16,4);
+     ctx.beginPath();ctx.moveTo(wx-cw*0.05,wy+ch*0.10);ctx.lineTo(wx,wy+ch*0.04);ctx.lineTo(wx+cw*0.05,wy+ch*0.10);ctx.fill();
+   }
+   if(name==='Freio'){
+     ctx.fillStyle=`rgba(239,68,68,${active?.9:.55})`;ctx.beginPath();ctx.arc(wx,wy,cw*0.045,0,Math.PI*2);ctx.fill();
+   } else if(name==='Aquaplanagem'){
+     ctx.strokeStyle=`rgba(56,189,248,${.45+.35*pulse})`;ctx.lineWidth=2;ctx.beginPath();ctx.arc(wx,wy,cw*0.13,0,Math.PI);ctx.stroke();
+   }
+ }
+ if(name==='Transmissão'){
+   const gy=topY+ch*0.04;
+   ctx.fillStyle='#3f3f46';ctx.beginPath();ctx.roundRect(cx-cw*0.12,gy,cw*0.24,ch*0.11,3);ctx.fill();
+   ctx.strokeStyle='#a1a1aa';ctx.strokeRect(cx-cw*0.12,gy,cw*0.24,ch*0.11);
+   if(active){ctx.fillStyle=`rgba(167,139,250,${.35+.35*pulse})`;ctx.fillRect(cx-cw*0.16,gy+ch*0.14,cw*0.32,3);}
+ }
+ if(name==='Farol'){
+   const lx=bx+cw*0.10,rx=bx+cw*0.90,ly=frontY+ch*0.02;
+   const on=active?tick%12<7:tick%30<12;
+   ctx.fillStyle=on?`rgba(253,224,71,${.65+.3*pulse})`:'rgba(90,90,70,.55)';
+   [lx,rx].forEach(x=>{ctx.beginPath();ctx.arc(x,ly,cw*0.055,0,Math.PI*2);ctx.fill();});
+ }
+ if(active){
+   ctx.fillStyle='rgba(0,0,0,.72)';ctx.beginPath();ctx.roundRect(cx-31,by+ch+8,62,16,4);ctx.fill();
+   ctx.fillStyle='#fbbf24';ctx.font="bold 11px 'VT323'";ctx.textAlign='center';
+   ctx.fillText(`${car.problem.emoji} EM SERVIÇO`,cx,by+ch+20);
+ }
+ ctx.restore();
 }
 function drawCarBadges(car,bx,by,cw,ch){
  const isWorking=car.diagnosed&&car.workProgress>0&&car.workProgress<car.maxWork;
