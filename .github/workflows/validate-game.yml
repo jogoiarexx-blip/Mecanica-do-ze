@@ -36,7 +36,8 @@ jobs:
           assert not missing, f'Missing refs: {missing}'
           js=Path('js/game.js').read_text(encoding='utf-8')
           assert 'function drawRepairVehicleVisuals' in js
+          assert 'DESMONTANDO' in js and 'INSTALANDO' in js and 'AJUSTE FINAL' in js
           assert js.count('drawRepairVehicleVisuals(car,bx,by,cw,ch);') >= 5
-          assert 'mecanica-ze-v9' in Path('sw.js').read_text(encoding='utf-8')
+          assert 'mecanica-ze-v10' in Path('sw.js').read_text(encoding='utf-8')
           print('OK: structure, manifest, repair visuals, PWA cache')
           PY
